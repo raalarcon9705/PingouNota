@@ -52,7 +52,7 @@ The entrypoint structure follows WXT's file-based extension layout; WXT supports
 - Create: entrypoints/sidepanel/main.tsx
 - Create: entrypoints/sidepanel/styles.css
 
-- [ ] **Step 1: Install the extension toolchain**
+- [x] **Step 1: Install the extension toolchain**
 
 Run from the repository root:
 
@@ -61,19 +61,19 @@ npm install react react-dom dexie zod
 npm install --save-dev wxt @wxt-dev/module-react typescript @types/chrome @types/react @types/react-dom vitest jsdom @testing-library/react @testing-library/jest-dom
 ~~~
 
-- [ ] **Step 2: Define the package scripts**
+- [x] **Step 2: Define the package scripts**
 
 Set scripts in package.json to dev: wxt, build: wxt build, zip: wxt zip, test: vitest run, test:watch: vitest, and postinstall: wxt prepare. Keep the package name pingounota, package version 0.1.0, and type module.
 
-- [ ] **Step 3: Configure WXT for Chrome MV3 and React**
+- [x] **Step 3: Configure WXT for Chrome MV3 and React**
 
 In wxt.config.ts, enable @wxt-dev/module-react; configure the Chrome manifest with name PingouNota, version 0.1.0, side panel sidepanel.html, the action title in pt-BR, and only sidePanel, storage, and alarms permissions plus the Adaflow host permission. Task 2 adds the exact Asaas and Husky origins after inspecting the authenticated pages. Do not request tabs, scripting, or broad <all_urls> permissions unless a documented portal requirement proves necessary.
 
-- [ ] **Step 4: Establish the side-panel entrypoint and style tokens**
+- [x] **Step 4: Establish the side-panel entrypoint and style tokens**
 
 Create a valid lang="pt-BR" HTML entrypoint and mount React from main.tsx. Define CSS custom properties for an Apple-system font stack, spacing, system colors, focus rings, separators, card surfaces, and light/dark color schemes. Include prefers-reduced-motion behavior. Use semantic HTML and visible text labels; do not rely on icon-only controls.
 
-- [ ] **Step 5: Build the extension package and commit**
+- [x] **Step 5: Build the extension package and commit**
 
 Run npm run build. Confirm WXT emits a Manifest V3 package with a side-panel entry and no broad host permissions. Commit as chore: scaffold PingouNota Chrome extension.
 
