@@ -1,0 +1,13 @@
+node_modules/
+.output/
+.wxt/
+coverage/
+*.tsbuildinfo
+.DS_Store
+.env*
+pingounota-backup-*.json
+backups/
+portal-dumps/
+browser-profiles/
+playwright-report/
+test-results/
