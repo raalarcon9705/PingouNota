@@ -2,7 +2,13 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 
-createRoot(document.getElementById('root')!).render(
+const root = document.getElementById('root');
+
+if (!root) {
+  throw new Error('PingouNota could not find the side-panel root element.');
+}
+
+createRoot(root).render(
   <StrictMode>
     <main className="panel">
       <header className="panel-header">
