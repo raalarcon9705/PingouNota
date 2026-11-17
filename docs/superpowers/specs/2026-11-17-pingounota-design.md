@@ -1,7 +1,7 @@
 # PingouNota — especificación de diseño del MVP
 
 **Fecha:** 2026-11-17  
-**Estado:** diseño aprobado en conversación; pendiente revisión del documento  
+**Estado:** diseño y especificación aprobados por el usuario
 **Nombre:** PingouNota  
 **Repositorio objetivo:** `raalarcon9705/PingouNota` (público)  
 **Licencia:** MIT
@@ -99,7 +99,7 @@ Los perfiles guardados son locales y no se sincronizan. No se asumirá que la ex
 
 La emisión real solo ocurre mediante la acción **“Emitir pela Adaflow”**. La revisión previa, individual o por lote, muestra al menos el tomador, documento, importe/moneda, CNAE, descripción, retención y correo de copia. Si falta un dato obligatorio o la moneda no está soportada, ese elemento no podrá enviarse hasta corregirlo.
 
-La API usa `POST /nfses` con `Authorization: Bearer <token>` e `Idempotency-Key`. El token se configura en PingouNota y se guarda localmente. Cada solicitud tendrá una clave única persistida junto al payload para evitar duplicados tras interrupciones. El campo `nfse.external_id` contendrá un identificador estable derivado del portal y del ID del pago, para asociar la nota con su pago y permitir consultas futuras por `external_id`. La API documenta un máximo de cinco solicitudes por minuto por token; un lote se enviará secuencialmente, sin concurrencia, con margen de tiempo para respetar el límite.
+La API usa `POST /nfses` con `Authorization: Bearer <token>` e `Idempotency-Key`. El token se configura en PingouNota y se guarda localmente. Cada solicitud tendrá una clave única persistida junto al payload para evitar duplicados tras interrupciones. El campo `nfse.external_id` incluirá el portal, el ID del pago y el ID de la operación de emisión; así cada intento explícito queda asociado al pago sin colisionar con una emisión anterior. La API documenta un máximo de cinco solicitudes por minuto por token; un lote se enviará secuencialmente, sin concurrencia, con margen de tiempo para respetar el límite.
 
 La respuesta `202 requested` significa que la emisión fue aceptada, no que la nota ya fue emitida. PingouNota guardará el ID devuelto y consultará `GET /nfses/{id}` hasta obtener un estado terminal. Si una nota sigue `requested` por más de 15 minutos, la interfaz indicará que requiere seguimiento y no la reemitirá automáticamente con una clave nueva. Los errores accionables se mostrarán junto al campo o pago correspondiente. Las operaciones exitosas no se repetirán al reintentar otros elementos del lote.
 
