@@ -144,6 +144,37 @@ describe('Payment State and Declaration Rules', () => {
     expect(reconciled.reversalFlaggedForReview).toBe(false);
   });
 
+  it('preserves existing payerName, amountCents, currency, and paymentDate when observed has null values', () => {
+    const existing = createSamplePayment({
+      payerName: 'Empresa Alpha Ltda',
+      amountCents: 99000,
+      currency: 'BRL',
+      paymentDate: '2026-11-15',
+      sourcePaymentId: 'pay_alpha_1',
+      identityFingerprint: 'fp_alpha',
+    });
+
+    const observedWithNulls: Partial<Payment> = {
+      payerName: null,
+      amountCents: null,
+      currency: null,
+      paymentDate: null,
+      sourcePaymentId: null,
+      identityFingerprint: null,
+      lastObservedAt: '2026-11-19T12:00:00Z',
+    };
+
+    const reconciled = reconcilePaymentObservation(existing, observedWithNulls);
+
+    expect(reconciled.payerName).toBe('Empresa Alpha Ltda');
+    expect(reconciled.amountCents).toBe(99000);
+    expect(reconciled.currency).toBe('BRL');
+    expect(reconciled.paymentDate).toBe('2026-11-15');
+    expect(reconciled.sourcePaymentId).toBe('pay_alpha_1');
+    expect(reconciled.identityFingerprint).toBe('fp_alpha');
+    expect(reconciled.lastObservedAt).toBe('2026-11-19T12:00:00Z');
+  });
+
   it('reversal after declaration sets flag for review', () => {
     // Case 1: Locally marked payment observed as reversed
     const markedPayment = createSamplePayment({

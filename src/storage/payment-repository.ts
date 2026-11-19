@@ -95,8 +95,8 @@ export async function listPayments(
       ) {
         return false;
       }
-      if (filter.startDate && p.paymentDate && p.paymentDate < filter.startDate) return false;
-      if (filter.endDate && p.paymentDate && p.paymentDate > filter.endDate) return false;
+      if (filter.startDate && (!p.paymentDate || p.paymentDate < filter.startDate)) return false;
+      if (filter.endDate && (!p.paymentDate || p.paymentDate > filter.endDate)) return false;
       return true;
     });
   }

@@ -123,19 +123,15 @@ export function reconcilePaymentObservation(
   return {
     provider: existing.provider,
     recordKey: existing.recordKey,
-    sourcePaymentId:
-      observed.sourcePaymentId !== undefined ? observed.sourcePaymentId : existing.sourcePaymentId,
+    sourcePaymentId: observed.sourcePaymentId ?? existing.sourcePaymentId,
     identityConfidence: observed.identityConfidence ?? existing.identityConfidence,
     ambiguousIdentity: observed.ambiguousIdentity ?? existing.ambiguousIdentity,
-    identityFingerprint:
-      observed.identityFingerprint !== undefined
-        ? observed.identityFingerprint
-        : existing.identityFingerprint,
-    payerName: observed.payerName !== undefined ? observed.payerName : existing.payerName,
-    amountCents: observed.amountCents !== undefined ? observed.amountCents : existing.amountCents,
-    currency: observed.currency !== undefined ? observed.currency : existing.currency,
-    paymentDate: observed.paymentDate !== undefined ? observed.paymentDate : existing.paymentDate,
-    sourceStatus: observed.sourceStatus !== undefined ? observed.sourceStatus : existing.sourceStatus,
+    identityFingerprint: observed.identityFingerprint ?? existing.identityFingerprint,
+    payerName: observed.payerName ?? existing.payerName,
+    amountCents: observed.amountCents ?? existing.amountCents,
+    currency: observed.currency ?? existing.currency,
+    paymentDate: observed.paymentDate ?? existing.paymentDate,
+    sourceStatus: observed.sourceStatus ?? existing.sourceStatus,
     paymentState: newPaymentState,
     declarationState: existing.declarationState,
     lastObservedAt: observed.lastObservedAt ?? new Date().toISOString(),

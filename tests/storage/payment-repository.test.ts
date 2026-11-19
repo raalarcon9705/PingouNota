@@ -259,23 +259,32 @@ describe('Payment Repository', () => {
           declarationState: 'marcado_localmente',
           paymentDate: '2026-11-03',
         }),
+        makePayment({
+          provider: 'asaas',
+          recordKey: 'p4',
+          paymentState: 'recebido',
+          declarationState: 'nao_declarado',
+          paymentDate: null,
+        }),
       ],
       testDb,
     );
 
     const asaasOnly = await listPayments({ provider: 'asaas' }, testDb);
-    expect(asaasOnly.length).toBe(2);
+    expect(asaasOnly.length).toBe(3);
 
     const recebidos = await listPayments({ paymentState: 'recebido' }, testDb);
-    expect(recebidos.length).toBe(2);
+    expect(recebidos.length).toBe(3);
 
     const naoDeclarados = await listPayments({ declarationState: 'nao_declarado' }, testDb);
-    expect(naoDeclarados.length).toBe(2);
+    expect(naoDeclarados.length).toBe(3);
 
+    // Date filtering must exclude payments with null paymentDate
     const dateFiltered = await listPayments(
       { startDate: '2026-11-02', endDate: '2026-11-03' },
       testDb,
     );
     expect(dateFiltered.length).toBe(2);
+    expect(dateFiltered.every((p) => p.paymentDate !== null)).toBe(true);
   });
 });
