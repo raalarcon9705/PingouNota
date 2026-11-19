@@ -21,10 +21,10 @@ export class PingouNotaDB extends Dexie {
     super(dbName);
     this.version(1).stores({
       payments:
-        '[provider+recordKey], provider, paymentState, declarationState, paymentDate, lastObservedAt',
+        '[provider+recordKey], provider, sourcePaymentId, paymentState, declarationState, paymentDate, lastObservedAt',
       takers: 'id, document, name',
       templates: 'id',
-      nfseOperations: 'id, provider, paymentRecordKey, externalId, idempotencyKey, status',
+      nfseOperations: 'id, provider, paymentRecordKey, externalId, &idempotencyKey, status',
       metadata: 'key',
     });
   }

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Payment } from '../../src/domain/payment';
+import type { NfseOperation } from '../../src/domain/nfse-operation';
 import { createDatabase, type PingouNotaDB } from '../../src/storage/database';
 import {
   clearPayments,
@@ -83,6 +84,73 @@ describe('Payment Repository', () => {
     // Confirm DB has only 1 record
     const all = await listPayments(undefined, testDb);
     expect(all.length).toBe(1);
+  });
+
+  it('matches high-confidence rows by portal ID (sourcePaymentId) and reconciles even with different recordKey', async () => {
+    // 1. Initial high-confidence payment stored with key "key_initial"
+    const initial = makePayment({
+      recordKey: 'key_initial',
+      sourcePaymentId: 'portal_pay_999',
+      identityConfidence: 'high',
+      declarationState: 'marcado_localmente',
+      manualDeclaredAt: '2026-11-19T10:00:00Z',
+    });
+    await upsertPayment(initial, testDb);
+
+    // 2. Incoming observation has different recordKey, but same sourcePaymentId
+    const incoming = makePayment({
+      recordKey: 'key_different',
+      sourcePaymentId: 'portal_pay_999',
+      identityConfidence: 'high',
+      payerName: 'Novo Nome do Pagador',
+      declarationState: 'nao_declarado',
+      manualDeclaredAt: null,
+    });
+
+    const reconciled = await upsertPayment(incoming, testDb);
+
+    // Should match by sourcePaymentId, preserve declaration state and original recordKey
+    expect(reconciled.recordKey).toBe('key_initial');
+    expect(reconciled.declarationState).toBe('marcado_localmente');
+    expect(reconciled.manualDeclaredAt).toBe('2026-11-19T10:00:00Z');
+    expect(reconciled.payerName).toBe('Novo Nome do Pagador');
+
+    // Ensure database contains only 1 record, not 2
+    const all = await listPayments(undefined, testDb);
+    expect(all.length).toBe(1);
+    expect(all[0]?.recordKey).toBe('key_initial');
+  });
+
+  it('rejects duplicate idempotencyKey on nfseOperations table due to unique index', async () => {
+    const op1: NfseOperation = {
+      id: 'op_1',
+      provider: 'asaas',
+      paymentRecordKey: 'pay_001',
+      externalId: 'ext_001',
+      idempotencyKey: 'idemp_unique_key_123',
+      payloadJson: '{}',
+      adaflowNfseId: null,
+      status: 'queued',
+      createdAt: '2026-11-19T10:00:00Z',
+      updatedAt: '2026-11-19T10:00:00Z',
+    };
+
+    await testDb.nfseOperations.add(op1);
+
+    const op2: NfseOperation = {
+      id: 'op_2',
+      provider: 'asaas',
+      paymentRecordKey: 'pay_002',
+      externalId: 'ext_002',
+      idempotencyKey: 'idemp_unique_key_123', // duplicate idempotencyKey!
+      payloadJson: '{}',
+      adaflowNfseId: null,
+      status: 'queued',
+      createdAt: '2026-11-19T10:05:00Z',
+      updatedAt: '2026-11-19T10:05:00Z',
+    };
+
+    await expect(testDb.nfseOperations.add(op2)).rejects.toThrow();
   });
 
   it('updates source status and flags reversal for review when declared payment is reversed', async () => {

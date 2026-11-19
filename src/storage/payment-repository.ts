@@ -27,9 +27,9 @@ export async function upsertPayment(
 
   if (!existing && payment.identityConfidence === 'high' && payment.sourcePaymentId) {
     existing = await dbInstance.payments
-      .where('provider')
-      .equals(payment.provider)
-      .filter((p) => p.sourcePaymentId === payment.sourcePaymentId)
+      .where('sourcePaymentId')
+      .equals(payment.sourcePaymentId)
+      .and((p) => p.provider === payment.provider)
       .first();
   }
 
