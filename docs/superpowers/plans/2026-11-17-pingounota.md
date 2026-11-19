@@ -428,23 +428,23 @@ Run npm run build. Commit as feat: add Portuguese payment side panel.
 - Create: tests/services/templates.test.ts
 - Create: tests/ui/local-mark-dialog.test.tsx
 
-- [ ] **Step 1: Implement template rendering**
+- [x] **Step 1: Implement template rendering**
 
 Render {{mes}} and {{ano}} using the payment's received date in the browser locale; expose the rendered description for editing before issue. Pull amount/currency from the payment. Preserve CNAE, withhold_taxes, and forwarding email from the selected template.
 
-- [ ] **Step 2: Implement local taker profile forms**
+- [x] **Step 2: Implement local taker profile forms**
 
 Allow creating/editing/selecting a locally saved service taker. Require CPF/CNPJ, name, and complete Brazilian address for a new Brazilian taker. Validate fields inline and retain entered data when validation fails.
 
-- [ ] **Step 3: Implement the local-mark confirmation**
+- [x] **Step 3: Implement the local-mark confirmation**
 
 Use the approved disclaimer verbatim. Confirming one or many received payments writes marcado_localmente and a timestamp to the local database only; it must not call the Adaflow client. Show a completion summary with the count marked.
 
-- [ ] **Step 4: Test template output and local-only behavior**
+- [x] **Step 4: Test template output and local-only behavior**
 
 Test placeholder rendering, custom description overrides, required taker fields, multi-mark timestamping, and that the dialog uses no Adaflow service. Run npm run test -- tests/services/templates.test.ts tests/ui/local-mark-dialog.test.tsx.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit as feat: add local declaration and service templates.
 
