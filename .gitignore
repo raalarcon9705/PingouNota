@@ -1,10 +1,13 @@
 node_modules/
 .output/
 .wxt/
+dist/
 coverage/
 *.tsbuildinfo
 .DS_Store
 .env*
+*.log
+*.zip
 pingounota-backup-*.json
 backups/
 portal-dumps/

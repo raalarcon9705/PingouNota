@@ -1,0 +1,83 @@
+name: Relato de Bug / Problema
+description: Crie um relatório para nos ajudar a identificar e corrigir falhas no PingouNota
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por ajudar a melhorar o **PingouNota**!
+        Antes de enviar este relatório, certifique-se de que os dados fornecidos não contêm segredos ou dados pessoais.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Descrição do Problema
+      description: Uma explicação concisa e clara do que aconteceu de errado.
+      placeholder: Ex: Ao clicar em "Escanear pagamentos", a lista não carrega os pagamentos recebidos...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: portal
+    attributes:
+      label: Portal ou Contexto Relacionado
+      description: Em qual portal ou tela o problema ocorreu?
+      options:
+        - Asaas
+        - Husky
+        - Adaflow
+        - Painel Lateral (Side Panel) / Configurações
+        - Outro / Geral
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Versão da Extensão e Navegador
+      description: Qual versão do PingouNota e do Chrome você está utilizando?
+      placeholder: "Ex: PingouNota v0.1.0, Google Chrome 130 (macOS)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Passos para Reproduzir
+      description: Sequência detalhada de ações para reproduzir o comportamento.
+      placeholder: |
+        1. Acessar o portal Asaas em '...'
+        2. Abrir o side panel do PingouNota
+        3. Clicar em '...'
+        4. Observar o erro...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-actual
+    attributes:
+      label: Comportamento Esperado vs. Comportamento Observado
+      description: O que você esperava que acontecesse e o que realmente aconteceu?
+      placeholder: |
+        Esperado: Os pagamentos deveriam ser sincronizados.
+        Observado: Foi exibida a mensagem de erro '...'.
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Informações Adicionais ou Logs do Console
+      description: Erros capturados no console do DevTools (inspecionar side panel ou extensão). Lembre-se de sanitizar tokens e IDs sensíveis.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: privacy-disclaimer
+    attributes:
+      label: Confirmação de Privacidade e Segurança
+      description: Por razões de privacidade e conformidade com a LGPD, relatórios com credenciais ou dados pessoais reais serão fechados e removidos imediatamente.
+      options:
+        - label: "Eu confirmo que NÃO incluí tokens de API, senhas, CPFs/CNPJs reais ou dados pessoais de clientes neste relatório."
+          required: true
