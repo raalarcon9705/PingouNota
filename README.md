@@ -40,6 +40,81 @@ A privacidade e a soberania dos seus dados são princípios fundamentais do Ping
 
 ---
 
+## 📸 Capturas de Tela e Interface (Dados 100% Sintéticos)
+
+> [!NOTE]
+> **Aviso de Privacidade e Dados Sintéticos:**
+> Todas as capturas de tela, diagramas e ilustrações exibidos na documentação e nos testes do PingouNota utilizam **estritamente dados sintéticos e fictícios** (por exemplo: *"Cliente Exemplo Ltda"*, *"pay_001"*, *"00.000.000/0001-91"*). Nenhuma informação real de clientes, contas bancárias ou credenciais é exposta.
+
+### 1. Painel de Pagamentos (`Side Panel`)
+Visualização dos pagamentos detectados nos portais Asaas ou Husky, com filtros por status e seleção em lote:
+
+```text
++-------------------------------------------------------------+
+| 🐧 PingouNota                     [Portais: Asaas | Husky]  |
++-------------------------------------------------------------+
+| [ Pagamentos (3) ]   [ Tomadores ]   [ Modelos ]  [ Config ] |
++-------------------------------------------------------------+
+| Filtrar: [ Todos os status v ]     [ Escanear Portal ]       |
++-------------------------------------------------------------+
+| [ ] [ASAAS] Cliente Exemplo Ltda                            |
+|     R$ 1.500,00 • Recebido em 15/11/2026                    |
+|     Status: [ Pendente de Emissão ]                         |
+|     [ Marcar emitida ]  [ Emitir Adaflow ]                  |
++-------------------------------------------------------------+
+| [ ] [HUSKY] Global Partner LLC                              |
+|     USD 2,000.00 (R$ 11.450,00) • Recebido em 14/11/2026   |
+|     Status: [ Emitida (Local) ]                             |
++-------------------------------------------------------------+
+| Ações em lote: [ Emitir Selecionados (1) ]                  |
++-------------------------------------------------------------+
+```
+
+### 2. Tela de Revisão de Emissão (`IssueReviewScreen`)
+Revisão obrigatória de todos os campos fiscais antes de qualquer chamada à API da Adaflow:
+
+```text
++-------------------------------------------------------------+
+| <- Voltar          Revisão de Emissão de NFS-e              |
++-------------------------------------------------------------+
+| Total a emitir: 1 nota(s) • Total estimado: R$ 1.500,00      |
+| Chave Idempotência: gerada automaticamente                  |
++-------------------------------------------------------------+
+| Tomador:   Cliente Exemplo Ltda                             |
+| CNPJ/CPF:  00.000.000/0001-91                               |
+| Valor:     R$ 1.500,00 (BRL)                                |
+| CNAE:      6201-5/01 - Desenvolvimento de software custom   |
+| Retenções: ISS retido na fonte: [ Não ]                     |
+| E-mail:    financeiro@clienteexemplo.com                    |
+| Descrição: Serviços de consultoria técnica em TI            |
++-------------------------------------------------------------+
+| [ Cancelar (Descarta Rascunho) ]  [ Confirmar e Enviar API ]|
++-------------------------------------------------------------+
+```
+
+### 3. Painel de Configurações e Dados (`SettingsScreen` / `DataControls`)
+Gerenciamento de credenciais da Adaflow e backup/restauração local:
+
+```text
++-------------------------------------------------------------+
+| ⚙️ Configurações e Gerenciamento de Dados                   |
++-------------------------------------------------------------+
+| Token de API Adaflow:                                       |
+| [ **************************************** ] [ Salvar ]     |
+| Status da API: Conectado (v1)                               |
++-------------------------------------------------------------+
+| Backup e Restauração Local (JSON):                          |
+| • Exportar todos os dados: [ Baixar Backup JSON ]           |
+| • Importar backup existente: [ Selecionar Arquivo ]         |
+|   (Pré-visualização atômica: mesclar ou substituir dados)   |
++-------------------------------------------------------------+
+| Zona de Perigo:                                             |
+| [ Apagar Todos os Dados Locais ] (Requer confirmação)       |
++-------------------------------------------------------------+
+```
+
+---
+
 ## 🔑 Permissões e Justificativas
 
 A extensão solicita apenas as permissões estritamente necessárias para o seu funcionamento:
