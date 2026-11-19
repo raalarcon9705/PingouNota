@@ -38,9 +38,13 @@ export const App: React.FC = () => {
     try {
       if (browser?.tabs?.query) {
         const tabs = await browser.tabs.query({ active: true, currentWindow: true });
-        const currentUrl = tabs[0]?.url;
-        if (currentUrl) {
-          if (!isSupportedPortalUrl(currentUrl)) {
+        const activeTab = tabs[0];
+        if (activeTab) {
+          if (!activeTab.url) {
+            // In Chrome MV3, tab.url is undefined on sites outside host_permissions.
+            // Since Asaas and Husky are in host_permissions, undefined url indicates an unsupported origin.
+            setSourceState('unsupported-origin');
+          } else if (!isSupportedPortalUrl(activeTab.url)) {
             setSourceState('unsupported-origin');
           } else {
             setSourceState('supported');
@@ -94,26 +98,15 @@ export const App: React.FC = () => {
     loadData();
     checkActiveTab();
 
-    // Listen for tab changes to detect if user switches outside supported portal
-    try {
-      const tabs = browser?.tabs;
-      if (tabs?.onActivated) {
-        const onActivated = () => {
-          checkActiveTab();
-        };
-        tabs.onActivated.addListener(onActivated);
+    const onActivated = () => {
+      checkActiveTab();
+    };
+
+    const onUpdated = (_tabId: number, changeInfo: { url?: string }) => {
+      if (changeInfo.url) {
+        checkActiveTab();
       }
-      if (tabs?.onUpdated) {
-        const onUpdated = (_tabId: number, changeInfo: { url?: string }) => {
-          if (changeInfo.url) {
-            checkActiveTab();
-          }
-        };
-        tabs.onUpdated.addListener(onUpdated);
-      }
-    } catch {
-      // Ignore in non-extension environment
-    }
+    };
 
     // Listen for extension messages to live-update the side panel
     const handleMessage = (message: unknown) => {
@@ -143,15 +136,22 @@ export const App: React.FC = () => {
     };
 
     try {
-      if (browser?.runtime?.onMessage) {
-        browser.runtime.onMessage.addListener(handleMessage);
-        return () => {
-          browser.runtime.onMessage.removeListener(handleMessage);
-        };
-      }
+      browser?.tabs?.onActivated?.addListener?.(onActivated);
+      browser?.tabs?.onUpdated?.addListener?.(onUpdated);
+      browser?.runtime?.onMessage?.addListener?.(handleMessage);
     } catch {
       // Ignore in non-extension environments (e.g. tests)
     }
+
+    return () => {
+      try {
+        browser?.tabs?.onActivated?.removeListener?.(onActivated);
+        browser?.tabs?.onUpdated?.removeListener?.(onUpdated);
+        browser?.runtime?.onMessage?.removeListener?.(handleMessage);
+      } catch {
+        // Ignore errors during cleanup
+      }
+    };
   }, [loadData, checkActiveTab]);
 
   const handleLocalMark = (selected: Payment[]) => {

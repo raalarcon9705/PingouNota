@@ -61,6 +61,10 @@ export function calculatePaymentSummary(payments: Payment[]): PaymentSummary {
   };
 }
 
+export function getPaymentCompositeKey(payment: Payment): string {
+  return `${payment.provider}:${payment.recordKey}`;
+}
+
 export function sortPayments(payments: Payment[]): Payment[] {
   return [...payments].sort((a, b) => {
     const aIsReceivedUndeclared =
@@ -156,10 +160,12 @@ export const PaymentsScreen: React.FC<PaymentsScreenProps> = ({
 
   const isAllSelectableSelected =
     selectableVisiblePayments.length > 0 &&
-    selectableVisiblePayments.every((p) => selectedRecordKeys.has(p.recordKey));
+    selectableVisiblePayments.every((p) =>
+      selectedRecordKeys.has(getPaymentCompositeKey(p)),
+    );
 
   const isSomeSelectableSelected = selectableVisiblePayments.some((p) =>
-    selectedRecordKeys.has(p.recordKey),
+    selectedRecordKeys.has(getPaymentCompositeKey(p)),
   );
 
   const isIndeterminate =
@@ -176,31 +182,31 @@ export const PaymentsScreen: React.FC<PaymentsScreenProps> = ({
       const next = new Set(prev);
       if (isAllSelectableSelected) {
         for (const p of selectableVisiblePayments) {
-          next.delete(p.recordKey);
+          next.delete(getPaymentCompositeKey(p));
         }
       } else {
         for (const p of selectableVisiblePayments) {
-          next.add(p.recordKey);
+          next.add(getPaymentCompositeKey(p));
         }
       }
       return next;
     });
   };
 
-  const handleToggleSelectRow = (recordKey: string) => {
+  const handleToggleSelectRow = (compositeKey: string) => {
     setSelectedRecordKeys((prev) => {
       const next = new Set(prev);
-      if (next.has(recordKey)) {
-        next.delete(recordKey);
+      if (next.has(compositeKey)) {
+        next.delete(compositeKey);
       } else {
-        next.add(recordKey);
+        next.add(compositeKey);
       }
       return next;
     });
   };
 
   const selectedPayments = useMemo(
-    () => rawPayments.filter((p) => selectedRecordKeys.has(p.recordKey)),
+    () => rawPayments.filter((p) => selectedRecordKeys.has(getPaymentCompositeKey(p))),
     [rawPayments, selectedRecordKeys],
   );
 
@@ -223,7 +229,7 @@ export const PaymentsScreen: React.FC<PaymentsScreenProps> = ({
             {summary.receivedCount}
           </span>
           <span className="summary-amount" data-testid="summary-received-amount">
-            {formatCurrency(summary.receivedTotalBrlCents, 'BRL')}
+            {formatCurrency(summary.receivedTotalBrlCents, 'BRL')} (BRL)
           </span>
         </article>
 
@@ -233,7 +239,7 @@ export const PaymentsScreen: React.FC<PaymentsScreenProps> = ({
             {summary.pendingCount}
           </span>
           <span className="summary-amount" data-testid="summary-pending-amount">
-            {formatCurrency(summary.pendingTotalBrlCents, 'BRL')}
+            {formatCurrency(summary.pendingTotalBrlCents, 'BRL')} (BRL)
           </span>
         </article>
       </section>
@@ -339,7 +345,7 @@ export const PaymentsScreen: React.FC<PaymentsScreenProps> = ({
               <PaymentRow
                 key={`${payment.provider}-${payment.recordKey}`}
                 payment={payment}
-                isSelected={selectedRecordKeys.has(payment.recordKey)}
+                isSelected={selectedRecordKeys.has(getPaymentCompositeKey(payment))}
                 onToggleSelect={handleToggleSelectRow}
               />
             ))}

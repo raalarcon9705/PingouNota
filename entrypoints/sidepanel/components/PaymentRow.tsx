@@ -109,7 +109,7 @@ export function getDeclarationStateLabel(state: DeclarationState): string {
 export interface PaymentRowProps {
   payment: Payment;
   isSelected: boolean;
-  onToggleSelect: (recordKey: string) => void;
+  onToggleSelect: (compositeKey: string) => void;
 }
 
 export const PaymentRow: React.FC<PaymentRowProps> = ({
@@ -117,6 +117,7 @@ export const PaymentRow: React.FC<PaymentRowProps> = ({
   isSelected,
   onToggleSelect,
 }) => {
+  const compositeKey = `${payment.provider}:${payment.recordKey}`;
   const eligibility = getSelectionEligibility(payment);
   const payer = payment.payerName || 'Pagador não identificado';
   const formattedAmount = formatCurrency(payment.amountCents, payment.currency);
@@ -141,7 +142,7 @@ export const PaymentRow: React.FC<PaymentRowProps> = ({
           id={checkboxId}
           checked={isSelected}
           disabled={!eligibility.selectable}
-          onChange={() => onToggleSelect(payment.recordKey)}
+          onChange={() => onToggleSelect(compositeKey)}
           title={eligibility.reason}
           aria-label={checkboxAriaLabel}
           className="payment-checkbox"

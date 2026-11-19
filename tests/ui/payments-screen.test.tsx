@@ -234,14 +234,14 @@ describe('PaymentsScreen & UI Components', () => {
       expect(within(receivedCard).getByText('Recebidos')).toBeInTheDocument();
       expect(within(receivedCard).getByTestId('summary-received-count')).toHaveTextContent('8');
       expect(within(receivedCard).getByTestId('summary-received-amount')).toHaveTextContent(
-        /R\$\s*3\.900,00/,
+        /R\$\s*3\.900,00\s*\(BRL\)/,
       );
 
       const pendingCard = screen.getByTestId('summary-pending');
       expect(within(pendingCard).getByText('Pendentes')).toBeInTheDocument();
       expect(within(pendingCard).getByTestId('summary-pending-count')).toHaveTextContent('1');
       expect(within(pendingCard).getByTestId('summary-pending-amount')).toHaveTextContent(
-        /R\$\s*800,00/,
+        /R\$\s*800,00\s*\(BRL\)/,
       );
     });
   });
@@ -521,6 +521,61 @@ describe('PaymentsScreen & UI Components', () => {
       fireEvent.click(checkbox);
       expect(checkbox).not.toBeChecked();
       expect(screen.queryByTestId('selection-bar')).not.toBeInTheDocument();
+    });
+
+    it('prevents selection collision across different providers sharing the same recordKey', () => {
+      const collisions: Payment[] = [
+        {
+          provider: 'asaas',
+          recordKey: 'shared_key_123',
+          sourcePaymentId: 'pay_a',
+          identityConfidence: 'high',
+          ambiguousIdentity: false,
+          identityFingerprint: null,
+          payerName: 'Cliente Asaas Compartilhado',
+          amountCents: 10000,
+          currency: 'BRL',
+          paymentDate: '2026-11-10',
+          sourceStatus: 'RECEIVED',
+          paymentState: 'recebido',
+          declarationState: 'nao_declarado',
+          lastObservedAt: '2026-11-10T10:00:00Z',
+          manualDeclaredAt: null,
+        },
+        {
+          provider: 'husky',
+          recordKey: 'shared_key_123',
+          sourcePaymentId: 'pay_h',
+          identityConfidence: 'high',
+          ambiguousIdentity: false,
+          identityFingerprint: null,
+          payerName: 'Cliente Husky Compartilhado',
+          amountCents: 20000,
+          currency: 'BRL',
+          paymentDate: '2026-11-10',
+          sourceStatus: 'COMPLETED',
+          paymentState: 'recebido',
+          declarationState: 'nao_declarado',
+          lastObservedAt: '2026-11-10T10:00:00Z',
+          manualDeclaredAt: null,
+        },
+      ];
+
+      render(<PaymentsScreen payments={collisions} />);
+
+      const asaasCheckbox = screen.getByLabelText(
+        'Selecionar pagamento de Cliente Asaas Compartilhado',
+      );
+      const huskyCheckbox = screen.getByLabelText(
+        'Selecionar pagamento de Cliente Husky Compartilhado',
+      );
+
+      fireEvent.click(asaasCheckbox);
+      expect(asaasCheckbox).toBeChecked();
+      expect(huskyCheckbox).not.toBeChecked();
+
+      const selectionBar = screen.getByTestId('selection-bar');
+      expect(within(selectionBar).getByText('1 pagamento selecionado')).toBeInTheDocument();
     });
   });
 
