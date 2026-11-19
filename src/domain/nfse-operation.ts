@@ -28,6 +28,7 @@ export interface NfseOperation {
   status: 'queued' | 'requested' | 'issued' | 'failed' | 'cancelled';
   createdAt: string;
   updatedAt: string;
+  errorMessage?: string | null;
 }
 
 export const nfseIssuePayloadSchema = z
@@ -76,4 +77,5 @@ export const nfseOperationSchema = z.object({
   status: z.enum(['queued', 'requested', 'issued', 'failed', 'cancelled']),
   createdAt: z.string(),
   updatedAt: z.string(),
+  errorMessage: z.string().nullable().optional(),
 });

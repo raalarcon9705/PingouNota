@@ -5,6 +5,7 @@ import {
   scanCoordinator,
   updateActionBadge,
 } from '../src/services/scan-coordinator';
+import { emissionQueue } from '../src/services/adaflow/emission-queue';
 
 export default defineBackground(() => {
   const setupStorageSecurity = async () => {
@@ -99,6 +100,20 @@ export default defineBackground(() => {
           })
           .catch((error) => {
             console.error('[PingouNota] Error handling scan control:', error);
+            sendResponse({ success: false, error: String(error) });
+          });
+
+        return true;
+      }
+
+      if (validMessage.type === 'ISSUE_QUEUE_START') {
+        emissionQueue
+          .processQueue(validMessage.operationIds)
+          .then(() => {
+            sendResponse({ success: true });
+          })
+          .catch((error) => {
+            console.error('[PingouNota] Error processing issue queue:', error);
             sendResponse({ success: false, error: String(error) });
           });
 

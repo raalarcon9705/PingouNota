@@ -4,13 +4,15 @@ import type { ScanProgress } from '../../src/shared/messages';
 import { scanCoordinator, type ScanStatus } from '../../src/services/scan-coordinator';
 import { listPayments } from '../../src/storage/payment-repository';
 import PaymentsScreen, { type PortalSourceState } from './screens/PaymentsScreen';
+import IssueReviewScreen from './screens/IssueReviewScreen';
+import OperationsScreen from './screens/OperationsScreen';
 import TemplatesScreen from './screens/TemplatesScreen';
 import TakersScreen from './screens/TakersScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import LocalMarkDialog from './components/LocalMarkDialog';
 import { browser } from 'wxt/browser';
 
-export type TabKey = 'pagamentos' | 'modelos' | 'tomadores' | 'configuracoes';
+export type TabKey = 'pagamentos' | 'operacoes' | 'modelos' | 'tomadores' | 'configuracoes';
 
 export function isSupportedPortalUrl(urlStr?: string): boolean {
   if (!urlStr) return false;
@@ -45,6 +47,9 @@ export const App: React.FC = () => {
   const [selectedForLocalMark, setSelectedForLocalMark] = useState<
     Payment[] | null
   >(null);
+
+  // Adaflow Review state
+  const [reviewPayments, setReviewPayments] = useState<Payment[] | null>(null);
 
   const checkActiveTab = useCallback(async () => {
     try {
@@ -125,7 +130,7 @@ export const App: React.FC = () => {
       if (!message || typeof message !== 'object') return;
       const msg = message as { type?: string; progress?: ScanProgress };
 
-      if (msg.type === 'PAYMENTS_OBSERVED') {
+      if (msg.type === 'PAYMENTS_OBSERVED' || msg.type === 'ISSUE_QUEUE_PROGRESS') {
         loadData();
       }
 
@@ -171,8 +176,7 @@ export const App: React.FC = () => {
   };
 
   const handleIssueAdaflow = (selected: Payment[]) => {
-    // Placeholder for Task 9: Adaflow NFSe issue
-    console.log('[PingouNota] Solicitação de emissão Adaflow para', selected.length, 'itens');
+    setReviewPayments(selected);
   };
 
   return (
@@ -194,9 +198,26 @@ export const App: React.FC = () => {
           aria-selected={activeTab === 'pagamentos'}
           aria-controls="tabpanel-pagamentos"
           id="tab-pagamentos"
-          onClick={() => setActiveTab('pagamentos')}
+          onClick={() => {
+            setReviewPayments(null);
+            setActiveTab('pagamentos');
+          }}
         >
           Pagamentos
+        </button>
+        <button
+          type="button"
+          role="tab"
+          className={`tab-btn ${activeTab === 'operacoes' ? 'tab-active' : ''}`}
+          aria-selected={activeTab === 'operacoes'}
+          aria-controls="tabpanel-operacoes"
+          id="tab-operacoes"
+          onClick={() => {
+            setReviewPayments(null);
+            setActiveTab('operacoes');
+          }}
+        >
+          Operações
         </button>
         <button
           type="button"
@@ -205,7 +226,10 @@ export const App: React.FC = () => {
           aria-selected={activeTab === 'modelos'}
           aria-controls="tabpanel-modelos"
           id="tab-modelos"
-          onClick={() => setActiveTab('modelos')}
+          onClick={() => {
+            setReviewPayments(null);
+            setActiveTab('modelos');
+          }}
         >
           Modelos
         </button>
@@ -216,7 +240,10 @@ export const App: React.FC = () => {
           aria-selected={activeTab === 'tomadores'}
           aria-controls="tabpanel-tomadores"
           id="tab-tomadores"
-          onClick={() => setActiveTab('tomadores')}
+          onClick={() => {
+            setReviewPayments(null);
+            setActiveTab('tomadores');
+          }}
         >
           Tomadores
         </button>
@@ -227,7 +254,10 @@ export const App: React.FC = () => {
           aria-selected={activeTab === 'configuracoes'}
           aria-controls="tabpanel-configuracoes"
           id="tab-configuracoes"
-          onClick={() => setActiveTab('configuracoes')}
+          onClick={() => {
+            setReviewPayments(null);
+            setActiveTab('configuracoes');
+          }}
         >
           Configurações
         </button>
@@ -241,18 +271,42 @@ export const App: React.FC = () => {
             id="tabpanel-pagamentos"
             aria-labelledby="tab-pagamentos"
           >
-            <PaymentsScreen
-              payments={payments}
-              isLoading={isLoading}
-              sourceState={sourceState}
-              sourceStateMessage={sourceMessage}
-              scanStatus={scanStatus}
-              scanReason={scanReason}
-              pagesSeen={scanPages}
-              recordsFound={scanRecords}
-              onLocalMark={handleLocalMark}
-              onIssueAdaflow={handleIssueAdaflow}
-              onRefresh={loadData}
+            {reviewPayments ? (
+              <IssueReviewScreen
+                payments={reviewPayments}
+                onCancel={() => setReviewPayments(null)}
+                onConfirmed={async () => {
+                  setReviewPayments(null);
+                  setActiveTab('operacoes');
+                  await loadData();
+                }}
+              />
+            ) : (
+              <PaymentsScreen
+                payments={payments}
+                isLoading={isLoading}
+                sourceState={sourceState}
+                sourceStateMessage={sourceMessage}
+                scanStatus={scanStatus}
+                scanReason={scanReason}
+                pagesSeen={scanPages}
+                recordsFound={scanRecords}
+                onLocalMark={handleLocalMark}
+                onIssueAdaflow={handleIssueAdaflow}
+                onRefresh={loadData}
+              />
+            )}
+          </div>
+        )}
+
+        {activeTab === 'operacoes' && (
+          <div
+            role="tabpanel"
+            id="tabpanel-operacoes"
+            aria-labelledby="tab-operacoes"
+          >
+            <OperationsScreen
+              onNavigatePayments={() => setActiveTab('pagamentos')}
             />
           </div>
         )}

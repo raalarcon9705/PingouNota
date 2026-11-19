@@ -10,10 +10,11 @@ describe('App Navigation and Tab Integration', () => {
     await db.takers.clear();
   });
 
-  it('renders tab navigation with Pagamentos, Modelos, Tomadores, Configurações', async () => {
+  it('renders tab navigation with Pagamentos, Operações, Modelos, Tomadores, Configurações', async () => {
     render(<App />);
 
     expect(screen.getByRole('tab', { name: 'Pagamentos' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Operações' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Modelos' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Tomadores' })).toBeInTheDocument();
     expect(
@@ -30,6 +31,16 @@ describe('App Navigation and Tab Integration', () => {
       'true',
     );
     expect(screen.getByTestId('payments-screen')).toBeInTheDocument();
+
+    // Switch to Operações
+    fireEvent.click(screen.getByRole('tab', { name: 'Operações' }));
+    await waitFor(() => {
+      expect(screen.getByTestId('operations-screen')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('tab', { name: 'Operações' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
 
     // Switch to Modelos
     fireEvent.click(screen.getByRole('tab', { name: 'Modelos' }));
