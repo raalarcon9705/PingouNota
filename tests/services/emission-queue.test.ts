@@ -389,6 +389,72 @@ describe('EmissionQueue & buildNfseIssuePayload', () => {
       expect(updated?.adaflowNfseId).toBe(999);
     });
 
+    it('drains remaining queued operations in database after processing specific operationIds', async () => {
+      await testDb.payments.put({ ...sampleDomesticPayment, recordKey: 'pay_drain_1' });
+      await testDb.payments.put({ ...sampleDomesticPayment, recordKey: 'pay_drain_2' });
+
+      const op1: NfseOperation = {
+        id: 'op-drain-1',
+        provider: 'asaas',
+        paymentRecordKey: 'pay_drain_1',
+        externalId: 'ext_drain_1',
+        idempotencyKey: 'idem_drain_1',
+        payloadJson: JSON.stringify(
+          buildNfseIssuePayload(sampleDomesticPayment, sampleTemplate, sampleTaker),
+        ),
+        adaflowNfseId: null,
+        status: 'queued',
+        createdAt: new Date(Date.now() - 2000).toISOString(),
+        updatedAt: new Date(Date.now() - 2000).toISOString(),
+      };
+
+      const op2: NfseOperation = {
+        id: 'op-drain-2',
+        provider: 'asaas',
+        paymentRecordKey: 'pay_drain_2',
+        externalId: 'ext_drain_2',
+        idempotencyKey: 'idem_drain_2',
+        payloadJson: JSON.stringify(
+          buildNfseIssuePayload(sampleDomesticPayment, sampleTemplate, sampleTaker),
+        ),
+        adaflowNfseId: null,
+        status: 'queued',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await testDb.nfseOperations.put(op1);
+      await testDb.nfseOperations.put(op2);
+
+      const processedIds: string[] = [];
+      const mockClient = {
+        createNfse: vi.fn().mockImplementation(async (payload) => {
+          processedIds.push(payload.external_id);
+          return { id: 700 + processedIds.length, status: 'requested' };
+        }),
+        getNfse: vi.fn().mockResolvedValue({ id: 701, status: 'requested' }),
+      } as unknown as AdaflowClient;
+
+      const queue = new EmissionQueue({
+        dbInstance: testDb,
+        client: mockClient,
+        getAdaflowTokenFn: async () => 'test-token',
+        minGapMs: 0, // no gap for fast drain test
+      });
+
+      // Pass only op-drain-1 explicitly
+      await queue.processQueue(['op-drain-1']);
+
+      // Both op-drain-1 and op-drain-2 should be processed
+      expect(mockClient.createNfse).toHaveBeenCalledTimes(2);
+      expect(processedIds).toContain('asaas_pay_dom_1');
+
+      const updated1 = await testDb.nfseOperations.get('op-drain-1');
+      const updated2 = await testDb.nfseOperations.get('op-drain-2');
+      expect(updated1?.status).toBe('requested');
+      expect(updated2?.status).toBe('requested');
+    });
+
     it('marks operation failed when Adaflow token is not configured', async () => {
       await testDb.payments.put(sampleDomesticPayment);
 

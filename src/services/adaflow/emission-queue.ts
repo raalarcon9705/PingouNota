@@ -208,6 +208,7 @@ export class EmissionQueue {
 
   /**
    * Process queued emission operations sequentially with pacing and retries.
+   * Drains any remaining queued operations in the database before completing.
    */
   public async processQueue(operationIds?: string[]): Promise<void> {
     if (this.isProcessing) {
@@ -216,102 +217,147 @@ export class EmissionQueue {
 
     this.isProcessing = true;
     try {
-      let ops: NfseOperation[];
+      let pendingIds =
+        operationIds && operationIds.length > 0 ? [...operationIds] : undefined;
 
-      if (operationIds && operationIds.length > 0) {
-        const loaded = await Promise.all(
-          operationIds.map((id) => this.db.nfseOperations.get(id)),
-        );
-        ops = loaded.filter(
-          (op): op is NfseOperation => Boolean(op && op.status === 'queued'),
-        );
-      } else {
-        ops = await this.db.nfseOperations
-          .where('status')
-          .equals('queued')
-          .sortBy('createdAt');
-      }
+      while (true) {
+        let ops: NfseOperation[];
 
-      if (ops.length === 0) {
-        return;
-      }
-
-      const token = await this.getAdaflowTokenFn();
-      if (!token) {
-        const now = new Date().toISOString();
-        for (const op of ops) {
-          await this.db.nfseOperations.update(op.id, {
-            status: 'failed',
-            errorMessage: 'Token Adaflow não configurado',
-            updatedAt: now,
-          });
-          await this.db.payments.update([op.provider, op.paymentRecordKey], {
-            declarationState: 'falha_adaflow',
-          });
-        }
-        await this.broadcastProgress(ops.map((o) => o.id));
-        return;
-      }
-
-      const client =
-        this.client ??
-        (this.clientFactory
-          ? this.clientFactory(token)
-          : new AdaflowClient({ token }));
-
-      for (const op of ops) {
-        // Re-check status from DB in case it changed
-        const fresh = await this.db.nfseOperations.get(op.id);
-        if (!fresh || fresh.status !== 'queued') {
-          continue;
+        if (pendingIds && pendingIds.length > 0) {
+          const loaded = await Promise.all(
+            pendingIds.map((id) => this.db.nfseOperations.get(id)),
+          );
+          ops = loaded.filter(
+            (op): op is NfseOperation => Boolean(op && op.status === 'queued'),
+          );
+          pendingIds = undefined;
+        } else {
+          ops = await this.db.nfseOperations
+            .where('status')
+            .equals('queued')
+            .sortBy('createdAt');
         }
 
-        let retries = 0;
-        let done = false;
+        if (ops.length === 0) {
+          break;
+        }
 
-        while (!done && retries <= this.maxNetworkRetries) {
-          await this.enforcePacing();
-
-          const now = this.nowFn();
-          this.recordPost(now);
-
-          const payload: NfseIssuePayload = JSON.parse(op.payloadJson);
-
-          try {
-            const res = await client.createNfse(payload, op.idempotencyKey);
+        const token = await this.getAdaflowTokenFn();
+        if (!token) {
+          const now = new Date().toISOString();
+          const allQueued = await this.db.nfseOperations
+            .where('status')
+            .equals('queued')
+            .toArray();
+          for (const op of allQueued) {
             await this.db.nfseOperations.update(op.id, {
-              adaflowNfseId: res.id,
-              status: 'requested',
-              updatedAt: new Date().toISOString(),
-              errorMessage: null,
+              status: 'failed',
+              errorMessage: 'Token Adaflow não configurado',
+              updatedAt: now,
             });
             await this.db.payments.update([op.provider, op.paymentRecordKey], {
-              declarationState: 'emissao_solicitada',
-              linkedNfseOperationId: op.id,
+              declarationState: 'falha_adaflow',
             });
-            await this.broadcastProgress([op.id]);
-            done = true;
-          } catch (error) {
-            if (error instanceof AdaflowRateLimitError) {
-              const retryAfter = error.retryAfter ?? 60;
-              this.pausedUntil = this.nowFn() + retryAfter * 1000;
-              await this.sleepFn(retryAfter * 1000);
-              // Retry the same operation
-              continue;
-            } else if (
-              error instanceof AdaflowTimeoutError ||
-              (error instanceof Error && error.name === 'TypeError') ||
-              (error instanceof Error &&
-                error.message.toLowerCase().includes('network')) ||
-              (error instanceof Error &&
-                error.message.toLowerCase().includes('fetch'))
-            ) {
-              retries++;
-              if (retries > this.maxNetworkRetries) {
+          }
+          await this.broadcastProgress(allQueued.map((o) => o.id));
+          return;
+        }
+
+        const client =
+          this.client ??
+          (this.clientFactory
+            ? this.clientFactory(token)
+            : new AdaflowClient({ token }));
+
+        for (const op of ops) {
+          // Re-check status from DB in case it changed
+          const fresh = await this.db.nfseOperations.get(op.id);
+          if (!fresh || fresh.status !== 'queued') {
+            continue;
+          }
+
+          let retries = 0;
+          let done = false;
+
+          while (!done && retries <= this.maxNetworkRetries) {
+            await this.enforcePacing();
+
+            const now = this.nowFn();
+            this.recordPost(now);
+
+            const payload: NfseIssuePayload = JSON.parse(op.payloadJson);
+
+            try {
+              const res = await client.createNfse(payload, op.idempotencyKey);
+              await this.db.nfseOperations.update(op.id, {
+                adaflowNfseId: res.id,
+                status: 'requested',
+                updatedAt: new Date().toISOString(),
+                errorMessage: null,
+              });
+              await this.db.payments.update([op.provider, op.paymentRecordKey], {
+                declarationState: 'emissao_solicitada',
+                linkedNfseOperationId: op.id,
+              });
+              await this.broadcastProgress([op.id]);
+              done = true;
+            } catch (error) {
+              if (error instanceof AdaflowRateLimitError) {
+                const retryAfter = error.retryAfter ?? 60;
+                this.pausedUntil = this.nowFn() + retryAfter * 1000;
+                await this.sleepFn(retryAfter * 1000);
+                // Retry the same operation
+                continue;
+              } else if (
+                error instanceof AdaflowTimeoutError ||
+                (error instanceof Error && error.name === 'TypeError') ||
+                (error instanceof Error &&
+                  error.message.toLowerCase().includes('network')) ||
+                (error instanceof Error &&
+                  error.message.toLowerCase().includes('fetch'))
+              ) {
+                retries++;
+                if (retries > this.maxNetworkRetries) {
+                  const msg =
+                    error instanceof Error
+                      ? error.message
+                      : 'Tempo limite ou erro de rede';
+                  await this.db.nfseOperations.update(op.id, {
+                    status: 'failed',
+                    errorMessage: msg,
+                    updatedAt: new Date().toISOString(),
+                  });
+                  await this.db.payments.update(
+                    [op.provider, op.paymentRecordKey],
+                    {
+                      declarationState: 'falha_adaflow',
+                    },
+                  );
+                  await this.broadcastProgress([op.id]);
+                  done = true;
+                } else {
+                  // Short wait before retrying with identical payload and same idempotencyKey
+                  await this.sleepFn(1000);
+                }
+              } else if (error instanceof AdaflowAuthError) {
+                await this.db.nfseOperations.update(op.id, {
+                  status: 'failed',
+                  errorMessage: 'Token Adaflow não configurado ou inválido',
+                  updatedAt: new Date().toISOString(),
+                });
+                await this.db.payments.update(
+                  [op.provider, op.paymentRecordKey],
+                  {
+                    declarationState: 'falha_adaflow',
+                  },
+                );
+                await this.broadcastProgress([op.id]);
+                done = true;
+              } else {
                 const msg =
                   error instanceof Error
                     ? error.message
-                    : 'Tempo limite ou erro de rede';
+                    : 'Erro na emissão da NFSe';
                 await this.db.nfseOperations.update(op.id, {
                   status: 'failed',
                   errorMessage: msg,
@@ -325,42 +371,7 @@ export class EmissionQueue {
                 );
                 await this.broadcastProgress([op.id]);
                 done = true;
-              } else {
-                // Short wait before retrying with identical payload and same idempotencyKey
-                await this.sleepFn(1000);
               }
-            } else if (error instanceof AdaflowAuthError) {
-              await this.db.nfseOperations.update(op.id, {
-                status: 'failed',
-                errorMessage: 'Token Adaflow não configurado ou inválido',
-                updatedAt: new Date().toISOString(),
-              });
-              await this.db.payments.update(
-                [op.provider, op.paymentRecordKey],
-                {
-                  declarationState: 'falha_adaflow',
-                },
-              );
-              await this.broadcastProgress([op.id]);
-              done = true;
-            } else {
-              const msg =
-                error instanceof Error
-                  ? error.message
-                  : 'Erro na emissão da NFSe';
-              await this.db.nfseOperations.update(op.id, {
-                status: 'failed',
-                errorMessage: msg,
-                updatedAt: new Date().toISOString(),
-              });
-              await this.db.payments.update(
-                [op.provider, op.paymentRecordKey],
-                {
-                  declarationState: 'falha_adaflow',
-                },
-              );
-              await this.broadcastProgress([op.id]);
-              done = true;
             }
           }
         }

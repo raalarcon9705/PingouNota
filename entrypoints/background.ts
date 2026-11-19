@@ -34,13 +34,50 @@ export default defineBackground(() => {
     }
   };
 
+  const setupQueueAlarms = async () => {
+    try {
+      if (typeof chrome !== 'undefined' && chrome?.alarms?.create) {
+        chrome.alarms.create('ADAFLOW_POLL_ALARM', { periodInMinutes: 1 });
+      } else if (typeof browser !== 'undefined' && browser?.alarms?.create) {
+        await browser.alarms.create('ADAFLOW_POLL_ALARM', { periodInMinutes: 1 });
+      }
+    } catch (error) {
+      console.warn('[PingouNota] Failed to setup poll alarm:', error);
+    }
+  };
+
+  const handleAlarm = async (alarm: { name: string }) => {
+    if (alarm.name === 'ADAFLOW_POLL_ALARM') {
+      try {
+        await emissionQueue.pollOperations();
+        await emissionQueue.processQueue();
+      } catch (err) {
+        console.warn('[PingouNota] Error during alarm queue handling:', err);
+      }
+    }
+  };
+
+  try {
+    if (typeof chrome !== 'undefined' && chrome?.alarms?.onAlarm) {
+      chrome.alarms.onAlarm.addListener(handleAlarm);
+    } else if (typeof browser !== 'undefined' && browser?.alarms?.onAlarm) {
+      browser.alarms.onAlarm.addListener(handleAlarm);
+    }
+  } catch {
+    // Non-extension or mock environment
+  }
+
   setupStorageSecurity().catch(() => {});
   setupSidePanel().catch(() => {});
+  setupQueueAlarms().catch(() => {});
 
   if (browser?.runtime?.onInstalled) {
     browser.runtime.onInstalled.addListener(() => {
       setupStorageSecurity().catch(() => {});
       setupSidePanel().catch(() => {});
+      setupQueueAlarms().catch(() => {});
+      emissionQueue.pollOperations().catch(() => {});
+      emissionQueue.processQueue().catch(() => {});
     });
   }
 
@@ -48,6 +85,9 @@ export default defineBackground(() => {
     browser.runtime.onStartup.addListener(() => {
       setupStorageSecurity().catch(() => {});
       setupSidePanel().catch(() => {});
+      setupQueueAlarms().catch(() => {});
+      emissionQueue.pollOperations().catch(() => {});
+      emissionQueue.processQueue().catch(() => {});
     });
   }
 
