@@ -124,7 +124,7 @@ Inspect each fixture for CPF/CNPJ, email, address, cookies, or any real customer
 - Create: tests/storage/payment-repository.test.ts
 - Create: vitest.config.ts
 
-- [ ] **Step 1: Define the normalized payment types**
+- [x] **Step 1: Define the normalized payment types**
 
 Represent money as integer cents plus an ISO currency code. Put Payment, PaymentProvider, and PaymentState in src/domain/payment.ts; TakerProfile and AdaflowServiceTaker in taker.ts; ServiceTemplate in template.ts; and NfseIssuePayload/NfseOperation in nfse-operation.ts. Use these exported shapes as the shared baseline; add non-secret metadata fields only when required by the spec:
 
@@ -204,23 +204,23 @@ export interface NfseOperation {
 
 Store provider, local record key, nullable portal payment ID, identity confidence/fingerprint/ambiguity, source status label, payer fields read from the page, payment date, last observed time, normalized arrival state, declaration state, and optional manual-declaration timestamp. Keep the four payment states and six declaration states as the literal unions shown above. The local taker type and API taker type are separate so address field naming is converted only at the API boundary.
 
-- [ ] **Step 2: Add state-transition functions and focused tests**
+- [x] **Step 2: Add state-transition functions and focused tests**
 
 Create pure functions that allow declaring only recebido with unambiguous identity; prevent a portal refresh from erasing declaration history; flag a reversal after declaration for review; and treat unrecognized source states as desconhecido. Test each transition, including ambiguous composite identity, with synthetic values.
 
-- [ ] **Step 3: Define taker, template, and operation schemas**
+- [x] **Step 3: Define taker, template, and operation schemas**
 
 Use Zod schemas for Brazilian documents, service addresses, template fields, and the frozen NFSe request. Validate that a new Brazilian taker has document, name, and all required address fields before submission. Validate supported foreign currency codes.
 
-- [ ] **Step 4: Create Dexie tables and indexes**
+- [x] **Step 4: Create Dexie tables and indexes**
 
 Create payments keyed by [provider+recordKey], takers keyed by a normalized local key, templates keyed by ID, nfseOperations keyed by operation ID with unique idempotency key, and metadata for backup schema version. Add indexes for provider, normalized payment state, declaration state, and received date.
 
-- [ ] **Step 5: Implement repository upserts and tests**
+- [x] **Step 5: Implement repository upserts and tests**
 
 Upserting an observed payment must preserve declarationState, manualDeclaredAt, and the linked NFSe operation unless those fields are explicitly changed by a declaration operation. Match high-confidence rows by portal ID and unique low-confidence rows by composite recordKey; never auto-merge ambiguous rows. Test duplicate observations, ambiguous composite collisions, and source updates.
 
-- [ ] **Step 6: Run focused tests and commit**
+- [x] **Step 6: Run focused tests and commit**
 
 Run npm run test -- tests/domain/payment-state.test.ts tests/storage/payment-repository.test.ts. Commit as feat: add local payment and declaration model.
 
