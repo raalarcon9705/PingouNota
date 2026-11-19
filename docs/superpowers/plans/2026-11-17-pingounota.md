@@ -328,15 +328,15 @@ Run npm run test -- tests/parsers/asaas-parser.test.ts tests/parsers/husky-parse
 - Modify: src/shared/messages.ts
 - Create: tests/services/scan-coordinator.test.ts
 
-- [ ] **Step 1: Define scan and pagination contracts**
+- [x] **Step 1: Define scan and pagination contracts**
 
 In src/services/scan-coordinator.ts define ScanStatus as idle | scanning | partial | complete | paused | failed and ScanResult with scanId, provider, status, pagesSeen, recordsFound, reason, and restoreStatus. Define provider adapters with parse(document): ParseResult and nextPage(document): PaginationResult, where PaginationResult is { kind: 'next'; href: string } | { kind: 'end' } | { kind: 'unsupported'; reason: string }. Persist only scan metadata, never HTML. On PORTAL_LIST_DETECTED, the service worker automatically starts a full scan if none completed for that provider; after completion, later visits start incremental scans. If the full scan is partial, the next visit resumes a full scan.
 
-- [ ] **Step 2: Implement list-page progression**
+- [x] **Step 2: Implement list-page progression**
 
 For each provider, read the next-page target only from the documented ordinary list control. Return end when the page explicitly indicates there is no next page; return unsupported with a reason when pagination cannot be identified. Reject targets outside the matching portal origin or payment-list route.
 
-- [ ] **Step 3: Build reliable payment identity**
+- [x] **Step 3: Build reliable payment identity**
 
 Implement createRecordIdentity(observation, scanOccurrences, existingMatches) with this contract:
 
@@ -360,19 +360,19 @@ export function createRecordIdentity(
 
 Use provider plus sourcePaymentId with high confidence when the portal ID exists. Without it, use Web Crypto SHA-256 over provider + normalized payer name + ISO payment date + amount cents + currency as the composite fingerprint and low-confidence record key only when the fingerprint is unique in the scan and database. If multiple rows share it, assign separate ambiguous local keys, flag all matching rows ambiguous, and do not merge, mark, or issue them automatically. Display low-confidence identity distinctly.
 
-- [ ] **Step 4: Mark scan-owned navigation**
+- [x] **Step 4: Mark scan-owned navigation**
 
 Before navigation, persist scanId and expected target. Pause if a click, keypress, or form interaction originates from the user, or if the active URL changes to a route other than the expected scan target. Never click submit, filter, payment, or destructive controls.
 
-- [ ] **Step 5: Restore the starting view safely**
+- [x] **Step 5: Restore the starting view safely**
 
 Restore the starting URL/filter only if the tab is still on the scan-owned route and no user interaction occurred. If unsafe or restoration fails, stop without another navigation and return status partial with restoreStatus failed.
 
-- [ ] **Step 6: Implement visible-page fallback and user controls**
+- [x] **Step 6: Implement visible-page fallback and user controls**
 
 When pagination is unsupported or navigation is unsafe, save current observations, mark the scan partial, and expose pause/cancel controls. When pagination returns end, mark the scan complete. Retrying a partial scan starts from the current visible page and does not repeat unsafe navigation.
 
-- [ ] **Step 7: Test scan outcomes and commit**
+- [x] **Step 7: Test scan outcomes and commit**
 
 Test complete, partial, paused, cancelled, unsafe-navigation, failed restoration, unique composite identity, and ambiguous fingerprint outcomes with fake adapters. Run npm run test -- tests/services/scan-coordinator.test.ts. Commit as feat: scan payment history with visible-page fallback.
 
