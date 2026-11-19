@@ -1,5 +1,5 @@
 import { browser } from 'wxt/browser';
-import { parseAsaasPayments } from '../src/parsers/asaas-parser';
+import { asaasAdapter } from '../src/services/scan-coordinator';
 import type { ExtensionMessage } from '../src/shared/messages';
 
 export default defineContentScript({
@@ -10,8 +10,29 @@ export default defineContentScript({
   ],
   runAt: 'document_idle',
   main() {
+    let userInteracted = false;
+
+    const onUserActivity = () => {
+      if (userInteracted) return;
+      userInteracted = true;
+      const pauseMsg: ExtensionMessage = {
+        type: 'SCAN_CONTROL',
+        action: 'pause',
+        provider: 'asaas',
+      };
+      browser.runtime.sendMessage(pauseMsg).catch(() => {});
+    };
+
+    ['mousedown', 'keydown', 'input'].forEach((evt) => {
+      window.addEventListener(evt, onUserActivity, { capture: true, passive: true });
+    });
+
     try {
       const pageUrl = window.location.href;
+      if (!asaasAdapter.isSupportedRoute(pageUrl)) {
+        return;
+      }
+
       const detectedMsg: ExtensionMessage = {
         type: 'PORTAL_LIST_DETECTED',
         provider: 'asaas',
@@ -20,7 +41,7 @@ export default defineContentScript({
 
       browser.runtime.sendMessage(detectedMsg).catch(() => {});
 
-      const result = parseAsaasPayments(document);
+      const result = asaasAdapter.parse(document);
       const scanId = crypto.randomUUID();
       const observedMsg: ExtensionMessage = {
         type: 'PAYMENTS_OBSERVED',

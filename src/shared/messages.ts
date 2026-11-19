@@ -5,10 +5,11 @@ import type { ParseResult } from './observed-payment';
 export interface ScanProgress {
   scanId: string;
   provider: PaymentProvider;
-  status: 'scanning' | 'partial' | 'complete' | 'paused' | 'failed';
+  status: 'idle' | 'scanning' | 'partial' | 'complete' | 'paused' | 'failed';
   pagesSeen: number;
   recordsFound: number;
   reason: string | null;
+  restoreStatus?: 'restored' | 'failed' | 'not_needed';
 }
 
 export type ExtensionMessage =
@@ -68,10 +69,11 @@ export const extensionMessageSchema = z.discriminatedUnion('type', [
     progress: z.object({
       scanId: z.string(),
       provider: z.enum(['asaas', 'husky']),
-      status: z.enum(['scanning', 'partial', 'complete', 'paused', 'failed']),
+      status: z.enum(['idle', 'scanning', 'partial', 'complete', 'paused', 'failed']),
       pagesSeen: z.number(),
       recordsFound: z.number(),
       reason: z.string().nullable(),
+      restoreStatus: z.enum(['restored', 'failed', 'not_needed']).optional(),
     }),
   }),
   z.object({
