@@ -105,6 +105,17 @@ describe('Scan Coordinator, Identity & Pagination', () => {
       expect(identity.recordKey).toContain(`asaas_ambig_${expectedFingerprint}_`);
     });
 
+    it('flags collision when existing match is already marked ambiguous', async () => {
+      const existingAmbiguous = await createPaymentFromObservation(sampleLowConfidenceObs);
+      existingAmbiguous.ambiguousIdentity = true;
+
+      const identity = await createRecordIdentity(sampleLowConfidenceObs, 1, [existingAmbiguous]);
+
+      expect(identity.identityConfidence).toBe('low');
+      expect(identity.ambiguousIdentity).toBe(true);
+      expect(identity.recordKey).toContain('asaas_ambig_');
+    });
+
     it('handles ambiguous collision in processObservedPayments without merging rows', async () => {
       // 2 identical observations in the same batch
       const obsList: ObservedPayment[] = [
@@ -546,6 +557,146 @@ describe('Scan Coordinator, Identity & Pagination', () => {
       const third = await coordinator.determineScanType('asaas', testDb);
       expect(third.scanType).toBe('full');
       expect(third.shouldResume).toBe(true);
+    });
+
+    it('tracks cumulative fingerprint collisions across multiple pages and flags all ambiguous', async () => {
+      const coordinator = new ScanCoordinator();
+      let currentUrl = 'https://app.asaas.com/customerPayment/index';
+      let pageNum = 1;
+
+      const identicalObservation: ObservedPayment = {
+        provider: 'asaas',
+        sourcePaymentId: null,
+        identityConfidence: 'low',
+        payerName: 'Identical Payer',
+        amountCents: 50000,
+        currency: 'BRL',
+        paymentDate: '2026-11-15',
+        sourceStatus: 'Recebido',
+        paymentState: 'recebido',
+      };
+
+      const page1Doc = createDocument(`
+        <table data-testid="payments-table">
+          <tbody><tr><td>P1</td></tr></tbody>
+        </table>
+        <a class="pagination-next" href="/customerPayment/index?page=2">Next</a>
+      `);
+
+      const page2Doc = createDocument(`
+        <table data-testid="payments-table">
+          <tbody><tr><td>P2</td></tr></tbody>
+        </table>
+        <a class="pagination-next disabled" href="/customerPayment/index?page=2">Next</a>
+      `);
+
+      const mockAdapter: ProviderAdapter = {
+        provider: 'asaas',
+        parse() {
+          return {
+            payments: [{ ...identicalObservation }],
+            warnings: [],
+            pagination: { kind: 'end' },
+          };
+        },
+        nextPage(doc: Document) {
+          const btn = doc.querySelector('.pagination-next');
+          if (!btn || btn.classList.contains('disabled')) return { kind: 'end' };
+          return { kind: 'next', href: btn.getAttribute('href')! };
+        },
+        isSupportedRoute: () => true,
+      };
+
+      const navigateFn = vi.fn(async (targetUrl: string) => {
+        currentUrl = targetUrl;
+        pageNum = 2;
+        return true;
+      });
+
+      const result = await coordinator.runScan('asaas', {
+        initialUrl: 'https://app.asaas.com/customerPayment/index',
+        getCurrentUrl: () => currentUrl,
+        getDocument: () => (pageNum === 1 ? page1Doc : page2Doc),
+        navigate: navigateFn,
+        adapter: mockAdapter,
+        dbInstance: testDb,
+      });
+
+      expect(result.status).toBe('complete');
+      expect(result.pagesSeen).toBe(2);
+      expect(result.recordsFound).toBe(2);
+
+      const fromDb = await listPayments(undefined, testDb);
+      expect(fromDb).toHaveLength(2);
+      expect(fromDb[0]?.ambiguousIdentity).toBe(true);
+      expect(fromDb[1]?.ambiguousIdentity).toBe(true);
+      expect(fromDb[0]?.recordKey).not.toBe(fromDb[1]?.recordKey);
+    });
+
+    it('stops scan when maxPages limit is reached', async () => {
+      const coordinator = new ScanCoordinator();
+      let page = 1;
+      let currentUrl = 'https://app.asaas.com/customerPayment/index';
+
+      const mockAdapter: ProviderAdapter = {
+        provider: 'asaas',
+        parse: () => ({
+          payments: [],
+          warnings: [],
+          pagination: { kind: 'next', href: `/customerPayment/index?page=${page + 1}` },
+        }),
+        nextPage: () => ({ kind: 'next', href: `/customerPayment/index?page=${page + 1}` }),
+        isSupportedRoute: () => true,
+      };
+
+      const result = await coordinator.runScan('asaas', {
+        initialUrl: currentUrl,
+        getCurrentUrl: () => currentUrl,
+        getDocument: () => createDocument('<div></div>'),
+        navigate: async (url) => {
+          currentUrl = url;
+          page++;
+          return true;
+        },
+        adapter: mockAdapter,
+        dbInstance: testDb,
+        maxPages: 2,
+      });
+
+      expect(result.status).toBe('complete');
+      expect(result.pagesSeen).toBe(2);
+    });
+
+    it('prevents infinite loop using cycle detection when page links back to a visited URL', async () => {
+      const coordinator = new ScanCoordinator();
+      let currentUrl = 'https://app.asaas.com/customerPayment/index';
+      let page = 1;
+
+      const mockAdapter: ProviderAdapter = {
+        provider: 'asaas',
+        parse: () => ({ payments: [], warnings: [], pagination: { kind: 'next', href: '/customerPayment/index' } }),
+        nextPage: () => {
+          const next = page === 1 ? '/customerPayment/index?page=2' : '/customerPayment/index';
+          return { kind: 'next', href: next };
+        },
+        isSupportedRoute: () => true,
+      };
+
+      const result = await coordinator.runScan('asaas', {
+        initialUrl: currentUrl,
+        getCurrentUrl: () => currentUrl,
+        getDocument: () => createDocument('<div></div>'),
+        navigate: async (url) => {
+          currentUrl = url;
+          page = 2;
+          return true;
+        },
+        adapter: mockAdapter,
+        dbInstance: testDb,
+      });
+
+      expect(result.status).toBe('complete');
+      expect(result.pagesSeen).toBe(2);
     });
   });
 

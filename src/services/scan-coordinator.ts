@@ -92,7 +92,10 @@ export async function createRecordIdentity(
     (m) => m.identityFingerprint === fingerprint,
   );
 
-  const isCollision = scanOccurrences > 1 || matchingExisting.length > 1;
+  const isCollision =
+    scanOccurrences > 1 ||
+    matchingExisting.length > 1 ||
+    matchingExisting.some((m) => m.ambiguousIdentity);
 
   if (!isCollision) {
     return {
@@ -142,6 +145,7 @@ export async function processObservedPayments(
   observedPayments: ObservedPayment[],
   observedAt: string = new Date().toISOString(),
   dbInstance?: PingouNotaDB,
+  cumulativeScanOccurrences?: Map<string, number>,
 ): Promise<Payment[]> {
   const targetDb = dbInstance ?? db;
   const existingPayments = await listPayments(undefined, targetDb);
@@ -154,6 +158,9 @@ export async function processObservedPayments(
       const fp = await calculatePaymentFingerprint(obs);
       lowConfidenceFingerprints.set(obs, fp);
       fingerprintCountsInScan.set(fp, (fingerprintCountsInScan.get(fp) || 0) + 1);
+      if (cumulativeScanOccurrences) {
+        cumulativeScanOccurrences.set(fp, (cumulativeScanOccurrences.get(fp) || 0) + 1);
+      }
     }
   }
 
@@ -166,10 +173,16 @@ export async function processObservedPayments(
 
     if (!obs.sourcePaymentId) {
       const fp = lowConfidenceFingerprints.get(obs)!;
-      scanOccurrences = fingerprintCountsInScan.get(fp) || 1;
+      scanOccurrences = cumulativeScanOccurrences
+        ? (cumulativeScanOccurrences.get(fp) || 1)
+        : (fingerprintCountsInScan.get(fp) || 1);
       matchingExisting = existingPayments.filter((p) => p.identityFingerprint === fp);
 
-      if (scanOccurrences > 1 || matchingExisting.length > 1) {
+      if (
+        scanOccurrences > 1 ||
+        matchingExisting.length > 1 ||
+        matchingExisting.some((m) => m.ambiguousIdentity)
+      ) {
         for (const existing of matchingExisting) {
           if (!existing.ambiguousIdentity) {
             existingToMarkAmbiguous.push({ ...existing, ambiguousIdentity: true });
@@ -188,7 +201,11 @@ export async function processObservedPayments(
   }
 
   if (existingToMarkAmbiguous.length > 0) {
-    await upsertPayments(existingToMarkAmbiguous, targetDb);
+    for (const existing of existingToMarkAmbiguous) {
+      await targetDb.payments.update([existing.provider, existing.recordKey], {
+        ambiguousIdentity: true,
+      });
+    }
   }
 
   return upsertPayments(paymentsToUpsert, targetDb);
@@ -588,6 +605,12 @@ export class ScanCoordinator {
     let reason: string | null = null;
     let restoreStatus: 'restored' | 'failed' | 'not_needed' = 'not_needed';
 
+    const cumulativeScanOccurrences = new Map<string, number>();
+    const visitedUrls = new Set<string>();
+    if (initialUrl) {
+      visitedUrls.add(initialUrl);
+    }
+
     broadcastProgress({
       scanId,
       provider,
@@ -631,10 +654,16 @@ export class ScanCoordinator {
           parseResult.payments,
           new Date().toISOString(),
           targetDb,
+          cumulativeScanOccurrences,
         );
         recordsFound += saved.length;
       }
       pagesSeen++;
+
+      if (options?.maxPages && pagesSeen >= options.maxPages) {
+        status = 'complete';
+        break;
+      }
 
       broadcastProgress({
         scanId,
@@ -667,13 +696,22 @@ export class ScanCoordinator {
           break;
         }
 
+        const resolvedTarget = resolveTargetUrl(nextHref, initialUrl);
+        if (visitedUrls.has(resolvedTarget) || visitedUrls.has(nextHref)) {
+          // Cycle detected: prevent infinite loop
+          status = 'complete';
+          break;
+        }
+        visitedUrls.add(resolvedTarget);
+        visitedUrls.add(nextHref);
+
         if (this.hasUserInteracted() || this.scanControlStatus === 'paused') {
           status = 'paused';
           reason = 'User interaction detected';
           break;
         }
 
-        expectedTargetUrl = resolveTargetUrl(nextHref, initialUrl);
+        expectedTargetUrl = resolvedTarget;
 
         try {
           await targetDb.metadata.put({

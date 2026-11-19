@@ -9,7 +9,7 @@ export default defineContentScript({
     '*://*.asaas.com/app/cobranzas*',
   ],
   runAt: 'document_idle',
-  main() {
+  async main() {
     let userInteracted = false;
 
     const onUserActivity = () => {
@@ -39,10 +39,15 @@ export default defineContentScript({
         pageUrl,
       };
 
-      browser.runtime.sendMessage(detectedMsg).catch(() => {});
+      const ack = (await browser.runtime.sendMessage(detectedMsg).catch(() => null)) as {
+        acknowledged?: boolean;
+        scanType?: 'full' | 'incremental';
+        scanId?: string;
+      } | null;
 
+      const scanId = ack?.scanId || crypto.randomUUID();
       const result = asaasAdapter.parse(document);
-      const scanId = crypto.randomUUID();
+
       const observedMsg: ExtensionMessage = {
         type: 'PAYMENTS_OBSERVED',
         scanId,
@@ -50,7 +55,16 @@ export default defineContentScript({
         result,
       };
 
-      browser.runtime.sendMessage(observedMsg).catch(() => {});
+      await browser.runtime.sendMessage(observedMsg).catch(() => {});
+
+      // Continue to next page if supported and user hasn't interacted
+      const pagination = asaasAdapter.nextPage(document);
+      if (pagination.kind === 'next' && !userInteracted) {
+        const nextHref = pagination.href;
+        if (asaasAdapter.isSupportedRoute(nextHref)) {
+          window.location.href = nextHref;
+        }
+      }
     } catch (err) {
       console.error('[PingouNota] Asaas content script error:', err);
     }
