@@ -4,8 +4,13 @@ import {
   saveAdaflowToken,
   removeAdaflowToken,
 } from '../../../src/services/adaflow/settings';
+import DataSettingsScreen from './DataSettingsScreen';
 
-export const SettingsScreen: React.FC = () => {
+export interface SettingsScreenProps {
+  onDataChanged?: () => void | Promise<void>;
+}
+
+export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onDataChanged }) => {
   const [tokenInput, setTokenInput] = useState('');
   const [savedToken, setSavedToken] = useState<string | null>(null);
   const [showToken, setShowToken] = useState(false);
@@ -219,6 +224,8 @@ export const SettingsScreen: React.FC = () => {
             exclusivamente no armazenamento local seguro da extensão.
           </p>
         </div>
+
+        <DataSettingsScreen onDataChanged={onDataChanged} />
       </div>
     </div>
   );

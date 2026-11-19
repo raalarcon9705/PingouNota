@@ -337,7 +337,7 @@ export const App: React.FC = () => {
             id="tabpanel-configuracoes"
             aria-labelledby="tab-configuracoes"
           >
-            <SettingsScreen />
+            <SettingsScreen onDataChanged={loadData} />
           </div>
         )}
       </div>

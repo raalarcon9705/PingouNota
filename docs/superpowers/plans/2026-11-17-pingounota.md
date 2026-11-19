@@ -542,31 +542,31 @@ Commit as feat: issue and track Adaflow NFSes in batches.
 - Create: tests/services/backup.test.ts
 - Create: tests/ui/import-preview.test.tsx
 
-- [ ] **Step 1: Define the backup envelope and schema version**
+- [x] **Step 1: Define the backup envelope and schema version**
 
 In src/services/backup.ts define BackupEnvelope with schemaVersion, exportedAt, payments, takers, templates, nfseOperations, and non-secret preferences. Define BackupPreview with counts, duplicate IDs, and validation errors. Exclude token and runtime state by type, not by filtering an arbitrary object after serialization.
 
-- [ ] **Step 2: Implement JSON export**
+- [x] **Step 2: Implement JSON export**
 
 Read the named Dexie tables, map them to BackupEnvelope, serialize UTF-8 JSON, and download a file named pingounota-backup-YYYY-MM-DD.json. Never include the Adaflow token, browser credentials, page HTML, or cookies.
 
-- [ ] **Step 3: Validate imported files without writing**
+- [x] **Step 3: Validate imported files without writing**
 
 Parse JSON and validate the entire BackupEnvelope with Zod. Return a BackupPreview with counts, duplicate IDs, schema version, and validation errors. Invalid files produce no database writes.
 
-- [ ] **Step 4: Build the import preview and confirmation UI**
+- [x] **Step 4: Build the import preview and confirmation UI**
 
 Show the preview, explain merge versus replace, and require confirmation before modifying data. Keep the original database intact if the user cancels.
 
-- [ ] **Step 5: Apply confirmed imports atomically**
+- [x] **Step 5: Apply confirmed imports atomically**
 
 Merge by provider/recordKey, taker ID, template ID, and operation ID inside one Dexie transaction. On replace, preserve only records included in the selected backup; never import a token. Abort the transaction on any write error.
 
-- [ ] **Step 6: Add delete-all control and backup tests**
+- [x] **Step 6: Add delete-all control and backup tests**
 
 Add a delete-all action that explains deletion scope and requires explicit confirmation. Test token exclusion, duplicate merge, replacement confirmation, invalid-file atomicity, and preservation of emission IDs. Run npm run test -- tests/services/backup.test.ts tests/ui/import-preview.test.tsx.
 
-- [ ] **Step 7: Run full automated suite and build**
+- [x] **Step 7: Run full automated suite and build**
 
 Run npm run test and npm run build. Commit as feat: add local data backup and deletion controls.
 
