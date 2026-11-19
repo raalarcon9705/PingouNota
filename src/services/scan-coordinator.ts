@@ -1,3 +1,4 @@
+import { browser } from 'wxt/browser';
 import type { Payment } from '../domain/payment';
 import type { ObservedPayment } from '../shared/observed-payment';
 import { listPayments, upsertPayments } from '../storage/payment-repository';
@@ -68,17 +69,10 @@ export async function updateActionBadge(dbInstance?: PingouNotaDB): Promise<numb
   const text = count > 0 ? String(count) : '';
 
   try {
-    const action =
-      typeof browser !== 'undefined' && browser.action
-        ? browser.action
-        : typeof chrome !== 'undefined' && chrome.action
-          ? chrome.action
-          : undefined;
-
-    if (action) {
-      await action.setBadgeText({ text });
-      if (count > 0 && action.setBadgeBackgroundColor) {
-        await action.setBadgeBackgroundColor({ color: '#2563eb' });
+    if (browser?.action) {
+      await browser.action.setBadgeText({ text });
+      if (count > 0 && browser.action.setBadgeBackgroundColor) {
+        await browser.action.setBadgeBackgroundColor({ color: '#2563eb' });
       }
     }
   } catch {

@@ -160,10 +160,10 @@ describe('Asaas Payments Parser', () => {
       </table>
     `;
     const result = parseAsaasPayments(createDocument(html));
-    expect(result.payments[0].paymentState).toBe('recebido');
-    expect(result.payments[1].paymentState).toBe('aguardando_recebimento');
-    expect(result.payments[2].paymentState).toBe('aguardando_recebimento');
-    expect(result.payments[3].paymentState).toBe('revertido_ou_cancelado');
+    expect(result.payments[0]?.paymentState).toBe('recebido');
+    expect(result.payments[1]?.paymentState).toBe('aguardando_recebimento');
+    expect(result.payments[2]?.paymentState).toBe('aguardando_recebimento');
+    expect(result.payments[3]?.paymentState).toBe('revertido_ou_cancelado');
   });
 
   it('handles empty lists gracefully', () => {
@@ -250,7 +250,7 @@ describe('Asaas Payments Parser', () => {
       </table>
     `;
     const result = parseAsaasPayments(createDocument(htmlWithMissingAmount));
-    expect(result.payments[0].amountCents).toBeNull();
+    expect(result.payments[0]?.amountCents).toBeNull();
     expect(result.warnings).toContainEqual(
       expect.objectContaining({ code: 'missing_amount', rowIndex: 0 }),
     );
@@ -260,6 +260,7 @@ describe('Asaas Payments Parser', () => {
     expect(parseDateToIso('15/11/2026')).toBe('2026-11-15');
     expect(parseDateToIso('01/01/2025')).toBe('2025-01-01');
     expect(parseDateToIso('2026-11-15')).toBe('2026-11-15');
+    expect(parseDateToIso('invalid-date')).toBeNull();
     expect(parseDateToIso('')).toBeNull();
     expect(parseDateToIso(null)).toBeNull();
   });

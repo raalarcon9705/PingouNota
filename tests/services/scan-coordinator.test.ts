@@ -4,7 +4,6 @@ import { clearPayments, listPayments } from '../../src/storage/payment-repositor
 import {
   coordinatePaymentsObservation,
   createPaymentFromObservation,
-  processObservedPayments,
 } from '../../src/services/scan-coordinator';
 import type { ObservedPayment } from '../../src/shared/observed-payment';
 import { extensionMessageSchema } from '../../src/shared/messages';

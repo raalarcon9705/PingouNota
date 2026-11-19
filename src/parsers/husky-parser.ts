@@ -26,13 +26,11 @@ export function parseHuskyCurrencyAndAmount(rawText: string | null | undefined):
     currency = 'BRL';
   } else if (trimmed.includes('$')) {
     currency = 'USD';
-  } else {
-    currency = 'USD';
   }
 
   const cleaned = trimmed.replace(/[A-Za-z$€£R]/g, '').trim();
-  if (!cleaned || !/\d/.test(cleaned)) {
-    return { amountCents: null, currency };
+  if (!cleaned || !/\d/.test(cleaned) || !currency) {
+    return { amountCents: null, currency: null };
   }
 
   let normalized: string;
@@ -45,15 +43,14 @@ export function parseHuskyCurrencyAndAmount(rawText: string | null | undefined):
       normalized = cleaned.replace(/,/g, '');
     }
   } else if (cleaned.includes(',')) {
-    // e.g. 500,00
     normalized = cleaned.replace(',', '.');
   } else {
-    // e.g. 500.00 or 500
     normalized = cleaned;
   }
+
   const parsed = parseFloat(normalized);
   if (isNaN(parsed)) {
-    return { amountCents: null, currency };
+    return { amountCents: null, currency: null };
   }
 
   return {

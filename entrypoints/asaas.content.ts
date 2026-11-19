@@ -1,3 +1,4 @@
+import { browser } from 'wxt/browser';
 import { parseAsaasPayments } from '../src/parsers/asaas-parser';
 import type { ExtensionMessage } from '../src/shared/messages';
 
@@ -17,16 +18,7 @@ export default defineContentScript({
         pageUrl,
       };
 
-      const runtime =
-        typeof browser !== 'undefined' && browser.runtime
-          ? browser.runtime
-          : typeof chrome !== 'undefined'
-            ? chrome.runtime
-            : undefined;
-
-      if (!runtime) return;
-
-      runtime.sendMessage(detectedMsg).catch(() => {});
+      browser.runtime.sendMessage(detectedMsg).catch(() => {});
 
       const result = parseAsaasPayments(document);
       const scanId = crypto.randomUUID();
@@ -37,7 +29,7 @@ export default defineContentScript({
         result,
       };
 
-      runtime.sendMessage(observedMsg).catch(() => {});
+      browser.runtime.sendMessage(observedMsg).catch(() => {});
     } catch (err) {
       console.error('[PingouNota] Asaas content script error:', err);
     }

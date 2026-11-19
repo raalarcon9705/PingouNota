@@ -149,10 +149,10 @@ describe('Husky Payments Parser', () => {
       </div>
     `;
     const result = parseHuskyPayments(createDocument(html));
-    expect(result.payments[0].paymentState).toBe('aguardando_recebimento');
-    expect(result.payments[1].paymentState).toBe('aguardando_recebimento');
-    expect(result.payments[2].paymentState).toBe('recebido');
-    expect(result.payments[3].paymentState).toBe('recebido');
+    expect(result.payments[0]?.paymentState).toBe('aguardando_recebimento');
+    expect(result.payments[1]?.paymentState).toBe('aguardando_recebimento');
+    expect(result.payments[2]?.paymentState).toBe('recebido');
+    expect(result.payments[3]?.paymentState).toBe('recebido');
   });
 
   it('handles empty lists gracefully', () => {
@@ -231,7 +231,11 @@ describe('Husky Payments Parser', () => {
     });
     expect(parseHuskyCurrencyAndAmount('-')).toEqual({
       amountCents: null,
-      currency: 'USD',
+      currency: null,
+    });
+    expect(parseHuskyCurrencyAndAmount('100.00')).toEqual({
+      amountCents: null,
+      currency: null,
     });
   });
 
@@ -245,7 +249,7 @@ describe('Husky Payments Parser', () => {
       </div>
     `;
     const result = parseHuskyPayments(createDocument(html));
-    expect(result.payments[0].amountCents).toBeNull();
+    expect(result.payments[0]?.amountCents).toBeNull();
     expect(result.warnings).toContainEqual(
       expect.objectContaining({ code: 'missing_amount', rowIndex: 0 }),
     );

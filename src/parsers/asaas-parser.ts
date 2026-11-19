@@ -8,7 +8,7 @@ export function parseDateToIso(dateStr: string | null | undefined): string | nul
 
   // DD/MM/YYYY or DD-MM-YYYY
   const brMatch = trimmed.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
-  if (brMatch) {
+  if (brMatch && brMatch[1] && brMatch[2] && brMatch[3]) {
     const day = brMatch[1].padStart(2, '0');
     const month = brMatch[2].padStart(2, '0');
     const year = brMatch[3];
@@ -17,11 +17,11 @@ export function parseDateToIso(dateStr: string | null | undefined): string | nul
 
   // Already ISO format YYYY-MM-DD
   const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (isoMatch) {
+  if (isoMatch && isoMatch[1] && isoMatch[2] && isoMatch[3]) {
     return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
   }
 
-  return trimmed;
+  return null;
 }
 
 export function parseBrlAmountToCents(amountStr: string | null | undefined): number | null {

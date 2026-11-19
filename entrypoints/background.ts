@@ -1,48 +1,42 @@
+import { browser } from 'wxt/browser';
 import { extensionMessageSchema } from '../src/shared/messages';
 import { coordinatePaymentsObservation, updateActionBadge } from '../src/services/scan-coordinator';
 
 export default defineBackground(() => {
   updateActionBadge().catch(() => {});
 
-  const runtime =
-    typeof browser !== 'undefined' && browser.runtime
-      ? browser.runtime
-      : typeof chrome !== 'undefined'
-        ? chrome.runtime
-        : undefined;
+  browser.runtime.onMessage.addListener(
+    (message: unknown, _sender: unknown, sendResponse: (response?: unknown) => void) => {
+      const parseResult = extensionMessageSchema.safeParse(message);
+      if (!parseResult.success) {
+        return false;
+      }
 
-  if (!runtime) return;
+      const validMessage = parseResult.data;
 
-  runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    const parseResult = extensionMessageSchema.safeParse(message);
-    if (!parseResult.success) {
-      return false;
-    }
-
-    const validMessage = parseResult.data;
-
-    if (validMessage.type === 'PAYMENTS_OBSERVED') {
-      coordinatePaymentsObservation(validMessage.result.payments)
-        .then(({ savedPayments, undeclaredCount }) => {
-          sendResponse({
-            success: true,
-            savedCount: savedPayments.length,
-            undeclaredCount,
+      if (validMessage.type === 'PAYMENTS_OBSERVED') {
+        coordinatePaymentsObservation(validMessage.result.payments)
+          .then(({ savedPayments, undeclaredCount }) => {
+            sendResponse({
+              success: true,
+              savedCount: savedPayments.length,
+              undeclaredCount,
+            });
+          })
+          .catch((error) => {
+            console.error('[PingouNota] Error processing observed payments:', error);
+            sendResponse({ success: false, error: String(error) });
           });
-        })
-        .catch((error) => {
-          console.error('[PingouNota] Error processing observed payments:', error);
-          sendResponse({ success: false, error: String(error) });
-        });
 
-      return true;
-    }
+        return true;
+      }
 
-    if (validMessage.type === 'PORTAL_LIST_DETECTED') {
-      sendResponse({ acknowledged: true });
+      if (validMessage.type === 'PORTAL_LIST_DETECTED') {
+        sendResponse({ acknowledged: true });
+        return false;
+      }
+
       return false;
-    }
-
-    return false;
-  });
+    },
+  );
 });
