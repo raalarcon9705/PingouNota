@@ -86,27 +86,27 @@ Run npm run build. Confirm WXT emits a Manifest V3 package with a side-panel ent
 - Create: tests/fixtures/husky-payments.html
 - Modify: wxt.config.ts
 
-- [ ] **Step 1: Inspect the authenticated Asaas payment list**
+- [x] **Step 1: Inspect the authenticated Asaas payment list**
 
 Record only the origin, payment-list route, row container, payment-ID source, exact received/pending/refunded labels, and next-page control. Do not save customer names, documents, addresses, amounts, cookies, or page storage.
 
-- [ ] **Step 2: Inspect the authenticated Husky payment list**
+- [x] **Step 2: Inspect the authenticated Husky payment list**
 
 Record only the origin, payment-list route, row container, payment-ID source, exact in-transit/arrived/reversed labels, and next-page control. Do not save customer names, documents, addresses, amounts, cookies, or page storage.
 
-- [ ] **Step 3: Write the Asaas integration note and sanitized fixture**
+- [x] **Step 3: Write the Asaas integration note and sanitized fixture**
 
 Document exact supported route patterns and map visible status strings to aguardando_recebimento, recebido, revertido_ou_cancelado, or desconhecido. Replace all portal data in the fixture with synthetic IDs, names, and amounts.
 
-- [ ] **Step 4: Write the Husky integration note and sanitized fixture**
+- [x] **Step 4: Write the Husky integration note and sanitized fixture**
 
 Document exact supported route patterns and map to recebido only when the page clearly indicates the transfer has arrived. Keep in-transit labels pending. Replace all customer and payment data in the fixture with synthetic values.
 
-- [ ] **Step 5: Restrict the host permissions**
+- [x] **Step 5: Restrict the host permissions**
 
 Update WXT host permissions to the exact Asaas and Husky origins discovered above. Keep Adaflow restricted to https://app.adaflow.com/*. The content-script route match patterns are configured in Task 4 from the same integration notes.
 
-- [ ] **Step 6: Review fixtures for sensitive data and commit**
+- [x] **Step 6: Review fixtures for sensitive data and commit**
 
 Inspect each fixture for CPF/CNPJ, email, address, cookies, or any real customer value and remove it. Commit as docs: define sanitized Asaas and Husky integration fixtures.
 
