@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Husky - Transferências Internacionais (Fixtura Sanitizada Sintética)</title>
+</head>
+<body>
+  <div class="husky-app-root">
+    <header class="dashboard-header">
+      <h2>Transferências</h2>
+    </header>
+    <main class="transfers-view">
+      <div class="transfers-container husky-transfers-list" data-testid="transfers-list">
+        <!-- Transfer 1: Arrived / Na conta (recebido) -->
+        <article class="transfer-card transfer-row" data-transfer-id="tra_husky_101">
+          <div class="transfer-header">
+            <span class="transfer-id" data-field="transfer-id">tra_husky_101</span>
+            <span class="transfer-date" data-field="date">18/11/2026</span>
+          </div>
+          <div class="transfer-body">
+            <div class="sender-info" data-field="sender">
+              <span class="transfer-sender">Acme Global Technologies Inc</span>
+            </div>
+            <div class="amount-info" data-field="amount">
+              <span class="transfer-amount">USD 4,200.00</span>
+            </div>
+          </div>
+          <div class="transfer-footer">
+            <span class="badge transfer-status status-arrived" data-field="status">Na conta</span>
+          </div>
+        </article>
+
+        <!-- Transfer 2: Arrived / Concluído (recebido) -->
+        <article class="transfer-card transfer-row" data-transfer-id="tra_husky_102">
+          <div class="transfer-header">
+            <span class="transfer-id" data-field="transfer-id">tra_husky_102</span>
+            <span class="transfer-date" data-field="date">17/11/2026</span>
+          </div>
+          <div class="transfer-body">
+            <div class="sender-info" data-field="sender">
+              <span class="transfer-sender">Stripe Inc Synthetic Client</span>
+            </div>
+            <div class="amount-info" data-field="amount">
+              <span class="transfer-amount">USD 1,850.50</span>
+            </div>
+          </div>
+          <div class="transfer-footer">
+            <span class="badge transfer-status status-completed" data-field="status">Concluído</span>
+          </div>
+        </article>
+
+        <!-- Transfer 3: In Transit / A caminho (aguardando_recebimento) -->
+        <article class="transfer-card transfer-row" data-transfer-id="tra_husky_103">
+          <div class="transfer-header">
+            <span class="transfer-id" data-field="transfer-id">tra_husky_103</span>
+            <span class="transfer-date" data-field="date">19/11/2026</span>
+          </div>
+          <div class="transfer-body">
+            <div class="sender-info" data-field="sender">
+              <span class="transfer-sender">Global Dev Partners LLC</span>
+            </div>
+            <div class="amount-info" data-field="amount">
+              <span class="transfer-amount">USD 3,100.00</span>
+            </div>
+          </div>
+          <div class="transfer-footer">
+            <span class="badge transfer-status status-in-transit" data-field="status">A caminho</span>
+          </div>
+        </article>
+
+        <!-- Transfer 4: In Processing / Em processamento (aguardando_recebimento) -->
+        <article class="transfer-card transfer-row" data-transfer-id="tra_husky_104">
+          <div class="transfer-header">
+            <span class="transfer-id" data-field="transfer-id">tra_husky_104</span>
+            <span class="transfer-date" data-field="date">19/11/2026</span>
+          </div>
+          <div class="transfer-body">
+            <div class="sender-info" data-field="sender">
+              <span class="transfer-sender">Nordic Cloud AB</span>
+            </div>
+            <div class="amount-info" data-field="amount">
+              <span class="transfer-amount">EUR 2,500.00</span>
+            </div>
+          </div>
+          <div class="transfer-footer">
+            <span class="badge transfer-status status-processing" data-field="status">Em processamento</span>
+          </div>
+        </article>
+
+        <!-- Transfer 5: Cancelled / Devolvido (revertido_ou_cancelado) -->
+        <article class="transfer-card transfer-row" data-transfer-id="tra_husky_105">
+          <div class="transfer-header">
+            <span class="transfer-id" data-field="transfer-id">tra_husky_105</span>
+            <span class="transfer-date" data-field="date">12/11/2026</span>
+          </div>
+          <div class="transfer-body">
+            <div class="sender-info" data-field="sender">
+              <span class="transfer-sender">Pacific Rim Software Ltd</span>
+            </div>
+            <div class="amount-info" data-field="amount">
+              <span class="transfer-amount">USD 900.00</span>
+            </div>
+          </div>
+          <div class="transfer-footer">
+            <span class="badge transfer-status status-returned" data-field="status">Devolvido</span>
+          </div>
+        </article>
+
+        <!-- Transfer 6: Unknown Status (desconhecido) -->
+        <article class="transfer-card transfer-row" data-transfer-id="tra_husky_106">
+          <div class="transfer-header">
+            <span class="transfer-id" data-field="transfer-id">tra_husky_106</span>
+            <span class="transfer-date" data-field="date">15/11/2026</span>
+          </div>
+          <div class="transfer-body">
+            <div class="sender-info" data-field="sender">
+              <span class="transfer-sender">Atlantic Ventures Inc</span>
+            </div>
+            <div class="amount-info" data-field="amount">
+              <span class="transfer-amount">USD 1,200.00</span>
+            </div>
+          </div>
+          <div class="transfer-footer">
+            <span class="badge transfer-status status-unknown" data-field="status">Retido para compliance</span>
+          </div>
+        </article>
+
+        <!-- Transfer 7: Missing ID edge case -->
+        <article class="transfer-card transfer-row">
+          <div class="transfer-header">
+            <span class="transfer-date" data-field="date">19/11/2026</span>
+          </div>
+          <div class="transfer-body">
+            <div class="sender-info" data-field="sender">
+              <span class="transfer-sender">Synthetic Corp LLC</span>
+            </div>
+            <div class="amount-info" data-field="amount">
+              <span class="transfer-amount">USD 500.00</span>
+            </div>
+          </div>
+          <div class="transfer-footer">
+            <span class="badge transfer-status status-arrived" data-field="status">Na conta</span>
+          </div>
+        </article>
+      </div>
+
+      <div class="pagination-section">
+        <a class="pagination-next" rel="next" href="/transfers?page=2" data-testid="pagination-next">
+          Carregar mais
+        </a>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

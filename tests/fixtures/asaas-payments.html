@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Asaas - Cobranças e Pagamentos (Fixtura Sanitizada Sintética)</title>
+</head>
+<body>
+  <div class="app-container">
+    <header class="app-header">
+      <h1>Cobranças</h1>
+    </header>
+    <main class="page-content">
+      <div class="table-responsive">
+        <table class="payments-table asaas-payments-table" data-testid="payments-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Cliente</th>
+              <th>Data</th>
+              <th>Valor</th>
+              <th>Forma de Pagamento</th>
+              <th>Status</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Row 1: Recebido (high confidence) -->
+            <tr class="payment-row" data-payment-id="pay_asaas_001">
+              <td data-field="payment-id">
+                <a class="payment-id" href="/customerPayment/show/pay_asaas_001">pay_asaas_001</a>
+              </td>
+              <td data-field="payer">
+                <span class="payer-name">Alpha Serviços de Tecnologia Ltda</span>
+                <span class="payer-doc text-muted">00.000.000/0001-91</span>
+              </td>
+              <td data-field="date" class="payment-date">15/11/2026</td>
+              <td data-field="amount" class="payment-amount">R$ 2.450,00</td>
+              <td data-field="billing-type">PIX</td>
+              <td data-field="status">
+                <span class="badge payment-status badge-success">Recebido</span>
+              </td>
+              <td><button type="button">Detalhes</button></td>
+            </tr>
+
+            <!-- Row 2: Aguardando Pagamento (high confidence) -->
+            <tr class="payment-row" data-payment-id="pay_asaas_002">
+              <td data-field="payment-id">
+                <a class="payment-id" href="/customerPayment/show/pay_asaas_002">pay_asaas_002</a>
+              </td>
+              <td data-field="payer">
+                <span class="payer-name">Beta Consultoria e Treinamento ME</span>
+                <span class="payer-doc text-muted">11.111.111/0001-11</span>
+              </td>
+              <td data-field="date" class="payment-date">16/11/2026</td>
+              <td data-field="amount" class="payment-amount">R$ 800,00</td>
+              <td data-field="billing-type">Boleto Bancário</td>
+              <td data-field="status">
+                <span class="badge payment-status badge-warning">Aguardando pagamento</span>
+              </td>
+              <td><button type="button">Detalhes</button></td>
+            </tr>
+
+            <!-- Row 3: Estornado (revertido_ou_cancelado) -->
+            <tr class="payment-row" data-payment-id="pay_asaas_003">
+              <td data-field="payment-id">
+                <a class="payment-id" href="/customerPayment/show/pay_asaas_003">pay_asaas_003</a>
+              </td>
+              <td data-field="payer">
+                <span class="payer-name">Gama Design e Mídia Ltda</span>
+                <span class="payer-doc text-muted">22.222.222/0001-22</span>
+              </td>
+              <td data-field="date" class="payment-date">14/11/2026</td>
+              <td data-field="amount" class="payment-amount">R$ 1.120,50</td>
+              <td data-field="billing-type">Cartão de Crédito</td>
+              <td data-field="status">
+                <span class="badge payment-status badge-danger">Estornado</span>
+              </td>
+              <td><button type="button">Detalhes</button></td>
+            </tr>
+
+            <!-- Row 4: Confirmado (recebido alternate label) -->
+            <tr class="payment-row" data-payment-id="pay_asaas_004">
+              <td data-field="payment-id">
+                <a class="payment-id" href="/customerPayment/show/pay_asaas_004">pay_asaas_004</a>
+              </td>
+              <td data-field="payer">
+                <span class="payer-name">Delta Soluções Digitais EIRELI</span>
+                <span class="payer-doc text-muted">33.333.333/0001-33</span>
+              </td>
+              <td data-field="date" class="payment-date">17/11/2026</td>
+              <td data-field="amount" class="payment-amount">R$ 3.000,00</td>
+              <td data-field="billing-type">PIX</td>
+              <td data-field="status">
+                <span class="badge payment-status badge-success">Confirmado</span>
+              </td>
+              <td><button type="button">Detalhes</button></td>
+            </tr>
+
+            <!-- Row 5: Cancelado (revertido_ou_cancelado) -->
+            <tr class="payment-row" data-payment-id="pay_asaas_005">
+              <td data-field="payment-id">
+                <a class="payment-id" href="/customerPayment/show/pay_asaas_005">pay_asaas_005</a>
+              </td>
+              <td data-field="payer">
+                <span class="payer-name">Épsilon Comunicação Integrada</span>
+                <span class="payer-doc text-muted">44.444.444/0001-44</span>
+              </td>
+              <td data-field="date" class="payment-date">13/11/2026</td>
+              <td data-field="amount" class="payment-amount">R$ 650,00</td>
+              <td data-field="billing-type">Boleto</td>
+              <td data-field="status">
+                <span class="badge payment-status badge-danger">Cancelado</span>
+              </td>
+              <td><button type="button">Detalhes</button></td>
+            </tr>
+
+            <!-- Row 6: Desconhecido (unrecognized status label) -->
+            <tr class="payment-row" data-payment-id="pay_asaas_006">
+              <td data-field="payment-id">
+                <a class="payment-id" href="/customerPayment/show/pay_asaas_006">pay_asaas_006</a>
+              </td>
+              <td data-field="payer">
+                <span class="payer-name">Omega Software House</span>
+                <span class="payer-doc text-muted">55.555.555/0001-55</span>
+              </td>
+              <td data-field="date" class="payment-date">18/11/2026</td>
+              <td data-field="amount" class="payment-amount">R$ 450,00</td>
+              <td data-field="billing-type">Outro</td>
+              <td data-field="status">
+                <span class="badge payment-status badge-secondary">Em análise manual</span>
+              </td>
+              <td><button type="button">Detalhes</button></td>
+            </tr>
+
+            <!-- Row 7: Missing ID edge case (no data-payment-id and no link) -->
+            <tr class="payment-row">
+              <td data-field="payment-id">
+                <span class="text-muted">-</span>
+              </td>
+              <td data-field="payer">
+                <span class="payer-name">Zeta Inovações Web Ltda</span>
+                <span class="payer-doc text-muted">66.666.666/0001-66</span>
+              </td>
+              <td data-field="date" class="payment-date">19/11/2026</td>
+              <td data-field="amount" class="payment-amount">R$ 950,00</td>
+              <td data-field="billing-type">PIX</td>
+              <td data-field="status">
+                <span class="badge payment-status badge-success">Recebido</span>
+              </td>
+              <td><button type="button">Detalhes</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <nav class="pagination-container" aria-label="Paginação">
+        <ul class="pagination">
+          <li class="page-item disabled"><span class="page-link">Anterior</span></li>
+          <li class="page-item active"><span class="page-link">1</span></li>
+          <li class="page-item"><a class="page-link" href="/customerPayment/index?offset=20">2</a></li>
+          <li class="page-item">
+            <a class="page-link pagination-next" rel="next" href="/customerPayment/index?offset=20">Próxima</a>
+          </li>
+        </ul>
+      </nav>
+    </main>
+  </div>
+</body>
+</html>

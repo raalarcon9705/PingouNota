@@ -8,7 +8,13 @@ export default defineConfig({
     version: '0.1.0',
     description: 'Acompanhe pagamentos e organize suas declarações de serviço.',
     permissions: ['sidePanel', 'storage', 'alarms'],
-    host_permissions: ['https://app.adaflow.com/*'],
+    host_permissions: [
+      'https://app.adaflow.com/*',
+      'https://www.asaas.com/*',
+      'https://app.asaas.com/*',
+      'https://app.husky.io/*',
+      'https://husky.io/*',
+    ],
     action: {
       default_title: 'Abrir PingouNota',
     },
