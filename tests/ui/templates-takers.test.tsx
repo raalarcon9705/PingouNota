@@ -135,12 +135,15 @@ describe('TakersScreen & TakerForm UI', () => {
       />,
     );
 
-    // Submit empty form
+    // Submit empty form (default country is Brasil)
     const saveBtn = screen.getByRole('button', { name: /Salvar Tomador/i });
     fireEvent.click(saveBtn);
 
     await waitFor(() => {
       expect(screen.getByText('Nome do tomador é obrigatório')).toBeInTheDocument();
+      expect(
+        screen.getByText('CPF ou CNPJ é obrigatório para tomadores no Brasil.'),
+      ).toBeInTheDocument();
       expect(screen.getByText('Logradouro é obrigatório')).toBeInTheDocument();
       expect(screen.getByText('Cidade é obrigatória')).toBeInTheDocument();
       expect(screen.getByText('Estado deve ter 2 caracteres')).toBeInTheDocument();
@@ -150,7 +153,7 @@ describe('TakersScreen & TakerForm UI', () => {
     expect(handleSave).not.toHaveBeenCalled();
 
     // Type invalid document (invalid CPF digits)
-    const docInput = screen.getByLabelText(/Documento \(CPF \/ CNPJ\)/i);
+    const docInput = screen.getByLabelText(/CPF ou CNPJ/i);
     fireEvent.change(docInput, { target: { value: '111.111.111-11' } });
     fireEvent.click(saveBtn);
 
@@ -164,6 +167,64 @@ describe('TakersScreen & TakerForm UI', () => {
     expect(docInput).toHaveValue('111.111.111-11');
   });
 
+  it('requires CPF/CNPJ for Brazilian takers and prevents saving when empty', async () => {
+    const handleSave = vi.fn();
+    const handleCancel = vi.fn();
+
+    render(
+      <TakerForm
+        onSave={handleSave}
+        onCancel={handleCancel}
+      />,
+    );
+
+    // Fill valid data for all fields except document (country is Brasil by default)
+    fireEvent.change(screen.getByLabelText(/Nome \/ Razão Social/i), {
+      target: { value: 'Tomador Brasil' },
+    });
+    fireEvent.change(screen.getByLabelText(/Logradouro/i), {
+      target: { value: 'Rua Teste' },
+    });
+    fireEvent.change(screen.getByLabelText(/Cidade/i), {
+      target: { value: 'São Paulo' },
+    });
+    fireEvent.change(screen.getByLabelText(/UF/i), {
+      target: { value: 'SP' },
+    });
+    fireEvent.change(screen.getByLabelText(/CEP/i), {
+      target: { value: '01310-100' },
+    });
+
+    // Document is intentionally left empty
+    const saveBtn = screen.getByRole('button', { name: /Salvar Tomador/i });
+    fireEvent.click(saveBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('CPF ou CNPJ é obrigatório para tomadores no Brasil.'),
+      ).toBeInTheDocument();
+    });
+
+    expect(handleSave).not.toHaveBeenCalled();
+
+    // Now provide valid CPF/CNPJ
+    fireEvent.change(screen.getByLabelText(/CPF ou CNPJ/i), {
+      target: { value: '00000000000191' },
+    });
+    fireEvent.click(saveBtn);
+
+    await waitFor(() => {
+      expect(handleSave).toHaveBeenCalledTimes(1);
+    });
+
+    expect(handleSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Tomador Brasil',
+        document: '00.000.000/0001-91',
+      }),
+    );
+  });
+
   it('formats CEP and creates taker successfully', async () => {
     render(<TakersScreen dbInstance={testDb} />);
 
@@ -175,6 +236,9 @@ describe('TakersScreen & TakerForm UI', () => {
 
     fireEvent.change(screen.getByLabelText(/Nome \/ Razão Social/i), {
       target: { value: 'Empresa Parceira' },
+    });
+    fireEvent.change(screen.getByLabelText(/CPF ou CNPJ/i), {
+      target: { value: '00000000000191' },
     });
     fireEvent.change(screen.getByLabelText(/Logradouro/i), {
       target: { value: 'Rua das Flores' },
@@ -193,11 +257,14 @@ describe('TakersScreen & TakerForm UI', () => {
     expect(screen.getByLabelText(/UF/i)).toHaveValue('PR');
     // CEP should be formatted
     expect(screen.getByLabelText(/CEP/i)).toHaveValue('80000-000');
+    // CNPJ should be formatted
+    expect(screen.getByLabelText(/CPF ou CNPJ/i)).toHaveValue('00.000.000/0001-91');
 
     fireEvent.click(screen.getByRole('button', { name: /Salvar Tomador/i }));
 
     await waitFor(() => {
       expect(screen.getByText('Empresa Parceira')).toBeInTheDocument();
+      expect(screen.getByText('00.000.000/0001-91')).toBeInTheDocument();
       expect(screen.getByText(/Curitiba\/PR/)).toBeInTheDocument();
     });
   });

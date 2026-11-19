@@ -35,6 +35,18 @@ export function formatCep(value: string): string {
   return digits.replace(/^(\d{5})(\d)/, '$1-$2').slice(0, 9);
 }
 
+export function isBrazilianCountry(
+  countryStr: string | null | undefined,
+): boolean {
+  if (!countryStr) return true;
+  const normalized = countryStr.trim().toLowerCase();
+  return (
+    normalized === 'brasil' ||
+    normalized === 'brazil' ||
+    normalized === 'br'
+  );
+}
+
 export const TakerForm: React.FC<TakerFormProps> = ({
   initialTaker,
   onSave,
@@ -118,15 +130,24 @@ export const TakerForm: React.FC<TakerFormProps> = ({
     };
 
     const parseResult = takerProfileSchema.safeParse(candidate);
+    const isBrazilian = isBrazilianCountry(formData.country);
+    const fieldErrors: Record<string, string> = {};
+
+    if (isBrazilian && !formData.document.trim()) {
+      fieldErrors.document =
+        'CPF ou CNPJ é obrigatório para tomadores no Brasil.';
+    }
 
     if (!parseResult.success) {
-      const fieldErrors: Record<string, string> = {};
       for (const issue of parseResult.error.issues) {
         const key = issue.path.join('.');
         if (!fieldErrors[key]) {
           fieldErrors[key] = issue.message;
         }
       }
+    }
+
+    if (Object.keys(fieldErrors).length > 0 || !parseResult.success) {
       setErrors(fieldErrors);
       // Retain entered data when validation fails
       return;
@@ -142,6 +163,8 @@ export const TakerForm: React.FC<TakerFormProps> = ({
       setIsSubmitting(false);
     }
   };
+
+  const isBrazilian = isBrazilianCountry(formData.country);
 
   return (
     <form
@@ -194,7 +217,7 @@ export const TakerForm: React.FC<TakerFormProps> = ({
         <div className="form-row">
           <div className="form-group flex-1">
             <label htmlFor="taker-document" className="form-label">
-              Documento (CPF / CNPJ)
+              CPF ou CNPJ {isBrazilian && <span className="required-indicator">*</span>}
             </label>
             <input
               id="taker-document"
