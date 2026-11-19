@@ -485,7 +485,7 @@ Run npm run build. Commit as feat: add Adaflow API configuration and client.
 - Create: tests/services/emission-queue.test.ts
 - Create: tests/ui/issue-review-screen.test.tsx
 
-- [ ] **Step 1: Build and validate an NFSe payload**
+- [x] **Step 1: Build and validate an NFSe payload**
 
 Expose a pure function with this signature in src/services/adaflow/emission-queue.ts:
 
@@ -505,31 +505,31 @@ export function buildNfseIssuePayload(
 
 Validate required fields and exactly one of value_cents or foreign_value_cents. Accept only Adaflow's documented foreign currencies.
 
-- [ ] **Step 2: Keep reviewed payloads as unsent drafts**
+- [x] **Step 2: Keep reviewed payloads as unsent drafts**
 
 Store validated payloads only in the review screen's draft state. Do not create an NfseOperation or idempotency key while the user is still reviewing. Canceling review must leave no operation in IndexedDB.
 
-- [ ] **Step 3: Render each issue review row**
+- [x] **Step 3: Render each issue review row**
 
 For each item, display taker name/document, amount and currency, CNAE, description, withholding setting, and forwarding email. Show inline validation errors and block only the invalid item; all valid rows remain reviewable.
 
-- [ ] **Step 4: Persist and enqueue after explicit confirmation**
+- [x] **Step 4: Persist and enqueue after explicit confirmation**
 
 Add a separate confirmation action that reports the number of valid NFSes and total BRL value when comparable. Only after confirmation, create an operation ID for each item, generate its idempotency key, build an external_id from provider + payment record key + operation ID, persist the frozen payload and queued status, and send the queue-start message. Test that canceling review persists no operation and confirmation persists one distinct operation per item.
 
-- [ ] **Step 5: Implement the paced sequential queue**
+- [x] **Step 5: Implement the paced sequential queue**
 
 Send no more than five POST requests in a rolling minute, sequentially, at least 13 seconds apart. Persist request start/result for each operation. On 429, pause for Retry-After when present or 60 seconds otherwise. On an uncertain timeout, replay only the identical POST with the same idempotency key and frozen payload; poll by Adaflow ID when known. Use external-ID lookup only while local history confirms that the external_id identifies exactly one operation.
 
-- [ ] **Step 6: Poll accepted NFSes and show outcomes**
+- [x] **Step 6: Poll accepted NFSes and show outcomes**
 
 Persist returned Adaflow IDs, use chrome.alarms to poll GET /nfses/{id}, and transition to issued, failed, or cancelled. If status remains requested for 15 minutes, show a follow-up state and stop automatic issue retries. Display per-item results and allow correction of actionable validation errors.
 
-- [ ] **Step 7: Test queue and review behavior**
+- [x] **Step 7: Test queue and review behavior**
 
 Use fake timers and mocked API responses to verify spacing, 429 pause/resume, idempotency persistence, requested polling, >15-minute handling, partial batch failure, and no duplicate successful issue. Test that review displays critical fields and requires confirmation. Run npm run test -- tests/services/emission-queue.test.ts tests/ui/issue-review-screen.test.tsx.
 
-- [ ] **Step 8: Build and commit**
+- [x] **Step 8: Build and commit**
 
 Commit as feat: issue and track Adaflow NFSes in batches.
 
