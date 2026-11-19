@@ -458,19 +458,19 @@ Commit as feat: add local declaration and service templates.
 - Modify: wxt.config.ts
 - Create: tests/services/adaflow-client.test.ts
 
-- [ ] **Step 1: Add local token settings**
+- [x] **Step 1: Add local token settings**
 
 Provide a password-style token field with show/hide control, save/delete actions, and pt-BR copy directing users to Adaflow Integrações. Do not add a fake test-connection action because the supplied OpenAPI has no authentication-only endpoint. Use chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' }) before reading the token; only the background service worker may read it.
 
-- [ ] **Step 2: Implement the typed client**
+- [x] **Step 2: Implement the typed client**
 
 Implement createNfse(payload, idempotencyKey) for POST https://app.adaflow.com/api/v1/nfses with JSON body { nfse: payload }, getNfse(id) for GET /nfses/{id}, and getNfseByExternalId(externalId) for GET /nfses/by-external-id/{external_id}. Add bearer auth, JSON content type, Idempotency-Key on POST, response validation, timeout handling, and mapping for 401/404/422/429/500 responses. URL-encode IDs in path segments. Keep all fetch calls in the background context.
 
-- [ ] **Step 3: Add client tests using mocked fetch**
+- [x] **Step 3: Add client tests using mocked fetch**
 
 Cover URL, auth header, idempotency header, each endpoint, success responses, validation errors, 401, 404, 429, timeout, malformed JSON, and status parsing. Run npm run test -- tests/services/adaflow-client.test.ts.
 
-- [ ] **Step 4: Build and commit**
+- [x] **Step 4: Build and commit**
 
 Run npm run build. Commit as feat: add Adaflow API configuration and client.
 

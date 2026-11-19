@@ -6,6 +6,7 @@ import { listPayments } from '../../src/storage/payment-repository';
 import PaymentsScreen, { type PortalSourceState } from './screens/PaymentsScreen';
 import TemplatesScreen from './screens/TemplatesScreen';
 import TakersScreen from './screens/TakersScreen';
+import SettingsScreen from './screens/SettingsScreen';
 import LocalMarkDialog from './components/LocalMarkDialog';
 import { browser } from 'wxt/browser';
 
@@ -281,32 +282,8 @@ export const App: React.FC = () => {
             role="tabpanel"
             id="tabpanel-configuracoes"
             aria-labelledby="tab-configuracoes"
-            className="subscreen-container"
           >
-            <header className="subscreen-header">
-              <div>
-                <h2>Configurações</h2>
-                <p className="subscreen-subtitle">
-                  Preferências gerais e integração com a Adaflow.
-                </p>
-              </div>
-            </header>
-            <div className="settings-section">
-              <div className="settings-card">
-                <h3>Integração Adaflow</h3>
-                <p>
-                  As credenciais e configurações de emissão direta são gerenciadas
-                  localmente e armazenadas de forma segura nesta extensão.
-                </p>
-              </div>
-              <div className="settings-card">
-                <h3>Armazenamento Local</h3>
-                <p>
-                  Todos os dados de pagamentos, modelos e tomadores são salvos no
-                  banco de dados Dexie IndexedDB do seu navegador.
-                </p>
-              </div>
-            </div>
+            <SettingsScreen />
           </div>
         )}
       </div>

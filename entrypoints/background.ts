@@ -7,6 +7,16 @@ import {
 } from '../src/services/scan-coordinator';
 
 export default defineBackground(() => {
+  const setupStorageSecurity = async () => {
+    try {
+      if (typeof chrome !== 'undefined' && chrome?.storage?.local?.setAccessLevel) {
+        await chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
+      }
+    } catch (error) {
+      console.warn('[PingouNota] Storage security configuration unavailable:', error);
+    }
+  };
+
   const setupSidePanel = async () => {
     try {
       const sidePanel = (browser as unknown as {
@@ -23,16 +33,19 @@ export default defineBackground(() => {
     }
   };
 
+  setupStorageSecurity().catch(() => {});
   setupSidePanel().catch(() => {});
 
   if (browser?.runtime?.onInstalled) {
     browser.runtime.onInstalled.addListener(() => {
+      setupStorageSecurity().catch(() => {});
       setupSidePanel().catch(() => {});
     });
   }
 
   if (browser?.runtime?.onStartup) {
     browser.runtime.onStartup.addListener(() => {
+      setupStorageSecurity().catch(() => {});
       setupSidePanel().catch(() => {});
     });
   }
