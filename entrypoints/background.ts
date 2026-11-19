@@ -7,7 +7,35 @@ import {
 } from '../src/services/scan-coordinator';
 
 export default defineBackground(() => {
-  updateActionBadge().catch(() => {});
+  const setupSidePanel = async () => {
+    try {
+      const sidePanel = (browser as unknown as {
+        sidePanel?: {
+          setPanelBehavior?: (options: { openPanelOnActionClick: boolean }) => Promise<void>;
+        };
+      }).sidePanel;
+
+      if (sidePanel?.setPanelBehavior) {
+        await sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+      }
+    } catch (error) {
+      console.warn('[PingouNota] Side panel behavior configuration unavailable:', error);
+    }
+  };
+
+  setupSidePanel().catch(() => {});
+
+  if (browser?.runtime?.onInstalled) {
+    browser.runtime.onInstalled.addListener(() => {
+      setupSidePanel().catch(() => {});
+    });
+  }
+
+  if (browser?.runtime?.onStartup) {
+    browser.runtime.onStartup.addListener(() => {
+      setupSidePanel().catch(() => {});
+    });
+  }
 
   browser.runtime.onMessage.addListener(
     (message: unknown, _sender: unknown, sendResponse: (response?: unknown) => void) => {
@@ -38,8 +66,9 @@ export default defineBackground(() => {
       if (validMessage.type === 'PORTAL_LIST_DETECTED') {
         scanCoordinator
           .handlePortalListDetected(validMessage.provider, validMessage.pageUrl)
-          .then((result) => {
-            sendResponse({ acknowledged: true, ...result });
+          .then(async (result) => {
+            const undeclaredCount = await updateActionBadge();
+            sendResponse({ acknowledged: true, undeclaredCount, ...result });
           })
           .catch((error) => {
             console.error('[PingouNota] Error handling portal list detection:', error);

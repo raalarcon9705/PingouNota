@@ -388,31 +388,31 @@ Test complete, partial, paused, cancelled, unsafe-navigation, failed restoration
 - Modify: entrypoints/sidepanel/styles.css
 - Create: tests/ui/payments-screen.test.tsx
 
-- [ ] **Step 1: Set the toolbar action to open the side panel**
+- [x] **Step 1: Set the toolbar action to open the side panel**
 
 In the service worker, call chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }). Show a badge only when a content script detects a supported portal. On other sites the side panel shows a concise help state directing the user to Asaas or Husky. Do not call sidePanel.open() from navigation events.
 
-- [ ] **Step 2: Add the summary cards**
+- [x] **Step 2: Add the summary cards**
 
 Create a typed summary selector that counts aguardando_recebimento and recebido independently. Test counts against a synthetic set containing every payment state; run npm run test -- tests/ui/payments-screen.test.tsx.
 
-- [ ] **Step 3: Add provider and state filters**
+- [x] **Step 3: Add provider and state filters**
 
 Create labeled controls for all providers and normalized payment/declaration states. Keep the selected filters in React state; test that each filter returns only matching rows.
 
-- [ ] **Step 4: Render payment rows and clear states**
+- [x] **Step 4: Render payment rows and clear states**
 
 Render payer, amount, received date, provider, source state, and declaration state. Add loading, empty, partial-scan, unsupported-origin, and source-unavailable views in pt-BR. Sort received undeclared payments first, then newest received date.
 
-- [ ] **Step 5: Add accessible multi-selection**
+- [x] **Step 5: Add accessible multi-selection**
 
 Only recebido payments with unambiguous identity in nao_declarado can be selected for a first declaration. An item in falha_adaflow can be retried only from its operation details after correcting the actionable error and creating a new reviewed operation. Keep pending, reversed, unknown, ambiguous identity, already locally marked, active requested, and already issued items unselectable, with a clear reason in the row. Test checkbox labels and disabled states.
 
-- [ ] **Step 6: Review responsive and accessible styling**
+- [x] **Step 6: Review responsive and accessible styling**
 
 Check the 320px panel width, light/dark color schemes, contrast, keyboard-visible focus, reduced-motion CSS, and 44px minimum controls. Run npm run test -- tests/ui/payments-screen.test.tsx.
 
-- [ ] **Step 7: Build and commit the panel**
+- [x] **Step 7: Build and commit the panel**
 
 Run npm run build. Commit as feat: add Portuguese payment side panel.
 
