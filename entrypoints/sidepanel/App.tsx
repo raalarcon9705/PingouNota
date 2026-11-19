@@ -3,16 +3,54 @@ import type { Payment } from '../../src/domain/payment';
 import type { ScanProgress } from '../../src/shared/messages';
 import { scanCoordinator, type ScanStatus } from '../../src/services/scan-coordinator';
 import { listPayments } from '../../src/storage/payment-repository';
-import PaymentsScreen from './screens/PaymentsScreen';
+import PaymentsScreen, { type PortalSourceState } from './screens/PaymentsScreen';
 import { browser } from 'wxt/browser';
+
+export function isSupportedPortalUrl(urlStr?: string): boolean {
+  if (!urlStr) return false;
+  try {
+    const url = new URL(urlStr);
+    const host = url.hostname.toLowerCase();
+    return (
+      host === 'asaas.com' ||
+      host.endsWith('.asaas.com') ||
+      host === 'husky.io' ||
+      host.endsWith('.husky.io') ||
+      host === 'localhost' ||
+      host === '127.0.0.1'
+    );
+  } catch {
+    return false;
+  }
+}
 
 export const App: React.FC = () => {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [sourceState, setSourceState] = useState<PortalSourceState>('supported');
+  const [sourceMessage, setSourceMessage] = useState<string | null>(null);
   const [scanStatus, setScanStatus] = useState<ScanStatus>('idle');
   const [scanReason, setScanReason] = useState<string | null>(null);
   const [scanPages, setScanPages] = useState<number>(0);
   const [scanRecords, setScanRecords] = useState<number>(0);
+
+  const checkActiveTab = useCallback(async () => {
+    try {
+      if (browser?.tabs?.query) {
+        const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+        const currentUrl = tabs[0]?.url;
+        if (currentUrl) {
+          if (!isSupportedPortalUrl(currentUrl)) {
+            setSourceState('unsupported-origin');
+          } else {
+            setSourceState('supported');
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('[PingouNota] Falha ao verificar aba ativa:', error);
+    }
+  }, []);
 
   const loadData = useCallback(async () => {
     try {
@@ -26,7 +64,9 @@ export const App: React.FC = () => {
       ]);
 
       const activeWarningMeta = [asaasMeta, huskyMeta].find(
-        (meta) => meta && (meta.status === 'partial' || meta.status === 'paused' || meta.status === 'failed'),
+        (meta) =>
+          meta &&
+          (meta.status === 'partial' || meta.status === 'paused' || meta.status === 'failed'),
       );
 
       if (activeWarningMeta) {
@@ -34,6 +74,14 @@ export const App: React.FC = () => {
         setScanReason(activeWarningMeta.reason);
         setScanPages(activeWarningMeta.pagesSeen);
         setScanRecords(activeWarningMeta.recordsFound);
+
+        if (activeWarningMeta.status === 'failed') {
+          setSourceState('source-unavailable');
+          setSourceMessage(
+            activeWarningMeta.reason ||
+              'Não foi possível conectar ao portal de pagamentos. Verifique se você está autenticado.',
+          );
+        }
       }
     } catch (error) {
       console.error('[PingouNota] Erro ao carregar pagamentos:', error);
@@ -44,6 +92,28 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     loadData();
+    checkActiveTab();
+
+    // Listen for tab changes to detect if user switches outside supported portal
+    try {
+      const tabs = browser?.tabs;
+      if (tabs?.onActivated) {
+        const onActivated = () => {
+          checkActiveTab();
+        };
+        tabs.onActivated.addListener(onActivated);
+      }
+      if (tabs?.onUpdated) {
+        const onUpdated = (_tabId: number, changeInfo: { url?: string }) => {
+          if (changeInfo.url) {
+            checkActiveTab();
+          }
+        };
+        tabs.onUpdated.addListener(onUpdated);
+      }
+    } catch {
+      // Ignore in non-extension environment
+    }
 
     // Listen for extension messages to live-update the side panel
     const handleMessage = (message: unknown) => {
@@ -60,7 +130,13 @@ export const App: React.FC = () => {
         setScanPages(msg.progress.pagesSeen);
         setScanRecords(msg.progress.recordsFound);
 
-        if (msg.progress.status === 'complete') {
+        if (msg.progress.status === 'failed') {
+          setSourceState('source-unavailable');
+          setSourceMessage(
+            msg.progress.reason ||
+              'Não foi possível conectar ao portal de pagamentos. Verifique se você está autenticado.',
+          );
+        } else if (msg.progress.status === 'complete') {
           loadData();
         }
       }
@@ -76,7 +152,7 @@ export const App: React.FC = () => {
     } catch {
       // Ignore in non-extension environments (e.g. tests)
     }
-  }, [loadData]);
+  }, [loadData, checkActiveTab]);
 
   const handleLocalMark = (selected: Payment[]) => {
     // Placeholder for Task 7: Local declaration marking
@@ -101,6 +177,8 @@ export const App: React.FC = () => {
       <PaymentsScreen
         payments={payments}
         isLoading={isLoading}
+        sourceState={sourceState}
+        sourceStateMessage={sourceMessage}
         scanStatus={scanStatus}
         scanReason={scanReason}
         pagesSeen={scanPages}

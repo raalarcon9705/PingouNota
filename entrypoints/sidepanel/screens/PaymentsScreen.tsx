@@ -11,7 +11,8 @@ import PaymentRow, {
   formatCurrency,
   getSelectionEligibility,
 } from '../components/PaymentRow';
-import ScanStatus from '../components/ScanStatus';
+import ScanStatus, { type PortalSourceState } from '../components/ScanStatus';
+export type { PortalSourceState };
 
 export interface PaymentSummary {
   receivedCount: number;
@@ -79,6 +80,8 @@ export function sortPayments(payments: Payment[]): Payment[] {
 export interface PaymentsScreenProps {
   payments?: Payment[];
   isLoading?: boolean;
+  sourceState?: PortalSourceState;
+  sourceStateMessage?: string | null;
   scanStatus?: ScanStatusType;
   scanReason?: string | null;
   pagesSeen?: number;
@@ -91,6 +94,8 @@ export interface PaymentsScreenProps {
 export const PaymentsScreen: React.FC<PaymentsScreenProps> = ({
   payments: controlledPayments,
   isLoading: controlledLoading,
+  sourceState = 'supported',
+  sourceStateMessage = null,
   scanStatus = 'idle',
   scanReason = null,
   pagesSeen = 0,
@@ -206,6 +211,8 @@ export const PaymentsScreen: React.FC<PaymentsScreenProps> = ({
         reason={scanReason}
         pagesSeen={pagesSeen}
         recordsFound={recordsFound}
+        sourceState={rawPayments.length === 0 && sourceState === 'unsupported-origin' ? undefined : sourceState}
+        sourceStateMessage={sourceStateMessage}
       />
 
       {/* Summary Cards */}
@@ -243,22 +250,39 @@ export const PaymentsScreen: React.FC<PaymentsScreenProps> = ({
 
       {/* Empty State: No payments detected at all */}
       {!isLoading && rawPayments.length === 0 && (
-        <div
-          className="empty-state"
-          role="region"
-          aria-label="Nenhum pagamento detectado"
-          data-testid="empty-state-no-payments"
-        >
-          <h3>Nenhum pagamento detectado</h3>
-          <p>
-            Acesse o portal do <strong>Asaas</strong> ou <strong>Husky</strong> em
-            uma aba do navegador para sincronizar e gerenciar seus recebimentos.
-          </p>
-          <p className="empty-hint">
-            O PingouNota detecta automaticamente novos pagamentos quando você acessa
-            o histórico financeiro nesses portais.
-          </p>
-        </div>
+        sourceState === 'unsupported-origin' ? (
+          <div
+            className="empty-state unsupported-origin-state"
+            role="region"
+            aria-label="Origem não suportada"
+            data-testid="view-unsupported-origin"
+          >
+            <h3>Origem não suportada</h3>
+            <p>
+              Abra o portal do <strong>Asaas</strong> (asaas.com) ou da <strong>Husky</strong> (husky.io) para detectar e conciliar seus pagamentos.
+            </p>
+            <p className="empty-hint">
+              O PingouNota funciona sincronizando pagamentos diretamente dos portais financeiros suportados.
+            </p>
+          </div>
+        ) : (
+          <div
+            className="empty-state"
+            role="region"
+            aria-label="Nenhum pagamento detectado"
+            data-testid="empty-state-no-payments"
+          >
+            <h3>Nenhum pagamento detectado</h3>
+            <p>
+              Acesse o portal do <strong>Asaas</strong> ou <strong>Husky</strong> em
+              uma aba do navegador para sincronizar e gerenciar seus recebimentos.
+            </p>
+            <p className="empty-hint">
+              O PingouNota detecta automaticamente novos pagamentos quando você acessa
+              o histórico financeiro nesses portais.
+            </p>
+          </div>
+        )
       )}
 
       {/* Empty Filtered State: Payments exist, but none match filters */}

@@ -11,6 +11,7 @@ import {
   formatCurrency,
   formatDatePtBr,
 } from '../../entrypoints/sidepanel/components/PaymentRow';
+import { isSupportedPortalUrl } from '../../entrypoints/sidepanel/App';
 
 describe('PaymentsScreen & UI Components', () => {
   // Synthetic dataset covering every single paymentState and declarationState plus edge cases
@@ -570,6 +571,68 @@ describe('PaymentsScreen & UI Components', () => {
       expect(screen.getByText('Sincronização parcial')).toBeInTheDocument();
       expect(screen.getByText('Erro de conexão na página 3')).toBeInTheDocument();
     });
+
+    it('renders unsupported-origin view directing user to Asaas or Husky when on unsupported site', () => {
+      // Scenario A: Unsupported origin with 0 payments
+      const { unmount } = render(
+        <PaymentsScreen payments={[]} sourceState="unsupported-origin" />,
+      );
+
+      const emptyView = screen.getByTestId('view-unsupported-origin');
+      expect(within(emptyView).getByText('Origem não suportada')).toBeInTheDocument();
+      expect(
+        within(emptyView).getByText(/Abra o portal do/i),
+      ).toBeInTheDocument();
+      expect(within(emptyView).getByText('Asaas')).toBeInTheDocument();
+      expect(within(emptyView).getByText('Husky')).toBeInTheDocument();
+      unmount();
+
+      // Scenario B: Unsupported origin with stored payments present
+      render(
+        <PaymentsScreen payments={syntheticPayments} sourceState="unsupported-origin" />,
+      );
+
+      const banner = screen.getByTestId('view-unsupported-origin');
+      expect(within(banner).getByText('Origem não suportada')).toBeInTheDocument();
+      expect(
+        within(banner).getByText(/Abra o portal do Asaas \(asaas\.com\) ou da Husky \(husky\.io\)/i),
+      ).toBeInTheDocument();
+      // Stored payments are still listed
+      expect(screen.getByText('Cliente Alfa BRL')).toBeInTheDocument();
+    });
+
+    it('renders source-unavailable view in pt-BR when portal connection fails or session expired', () => {
+      render(
+        <PaymentsScreen
+          payments={syntheticPayments}
+          sourceState="source-unavailable"
+        />,
+      );
+
+      const unavailableBanner = screen.getByTestId('view-source-unavailable');
+      expect(within(unavailableBanner).getByText('Portal indisponível')).toBeInTheDocument();
+      expect(
+        within(unavailableBanner).getByText(
+          'Não foi possível conectar ao portal de pagamentos. Verifique se você está autenticado.',
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it('renders custom source-unavailable message when provided', () => {
+      render(
+        <PaymentsScreen
+          payments={syntheticPayments}
+          sourceState="source-unavailable"
+          sourceStateMessage="Sessão expirada no portal Asaas."
+        />,
+      );
+
+      const unavailableBanner = screen.getByTestId('view-source-unavailable');
+      expect(within(unavailableBanner).getByText('Portal indisponível')).toBeInTheDocument();
+      expect(
+        within(unavailableBanner).getByText('Sessão expirada no portal Asaas.'),
+      ).toBeInTheDocument();
+    });
   });
 
   describe('Helper formatters', () => {
@@ -583,6 +646,19 @@ describe('PaymentsScreen & UI Components', () => {
       expect(formatDatePtBr('2026-11-15')).toBe('15/11/2026');
       expect(formatDatePtBr('2026-05-01T12:00:00Z')).toBe('01/05/2026');
       expect(formatDatePtBr(null)).toBe('Data não informada');
+    });
+
+    it('identifies supported vs unsupported portal URLs correctly', () => {
+      expect(isSupportedPortalUrl('https://app.asaas.com/customerPayment/index')).toBe(true);
+      expect(isSupportedPortalUrl('https://www.asaas.com')).toBe(true);
+      expect(isSupportedPortalUrl('https://app.husky.io/transfers')).toBe(true);
+      expect(isSupportedPortalUrl('https://husky.io/dashboard')).toBe(true);
+      expect(isSupportedPortalUrl('http://localhost:3000')).toBe(true);
+
+      expect(isSupportedPortalUrl('https://google.com')).toBe(false);
+      expect(isSupportedPortalUrl('https://app.adaflow.com')).toBe(false);
+      expect(isSupportedPortalUrl('invalid-url')).toBe(false);
+      expect(isSupportedPortalUrl(undefined)).toBe(false);
     });
   });
 });

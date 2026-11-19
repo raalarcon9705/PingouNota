@@ -1,11 +1,15 @@
 import React from 'react';
 import type { ScanStatus as ScanStatusType } from '../../../src/services/scan-coordinator';
 
+export type PortalSourceState = 'supported' | 'unsupported-origin' | 'source-unavailable';
+
 export interface ScanStatusProps {
   status?: ScanStatusType;
   reason?: string | null;
   pagesSeen?: number;
   recordsFound?: number;
+  sourceState?: PortalSourceState;
+  sourceStateMessage?: string | null;
 }
 
 export const ScanStatus: React.FC<ScanStatusProps> = ({
@@ -13,7 +17,46 @@ export const ScanStatus: React.FC<ScanStatusProps> = ({
   reason,
   pagesSeen = 0,
   recordsFound = 0,
+  sourceState = 'supported',
+  sourceStateMessage,
 }) => {
+  if (sourceState === 'source-unavailable') {
+    return (
+      <div
+        className="banner banner-danger banner-source-unavailable"
+        role="alert"
+        aria-live="assertive"
+        data-testid="view-source-unavailable"
+      >
+        <div className="banner-content">
+          <strong>Portal indisponível</strong>
+          <p>
+            {sourceStateMessage ||
+              'Não foi possível conectar ao portal de pagamentos. Verifique se você está autenticado.'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (sourceState === 'unsupported-origin') {
+    return (
+      <div
+        className="banner banner-warning banner-unsupported-origin"
+        role="region"
+        aria-label="Origem não suportada"
+        data-testid="view-unsupported-origin"
+      >
+        <div className="banner-content">
+          <strong>Origem não suportada</strong>
+          <p>
+            Abra o portal do Asaas (asaas.com) ou da Husky (husky.io) para detectar e conciliar seus pagamentos.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (status === 'idle' || status === 'complete') {
     return null;
   }
