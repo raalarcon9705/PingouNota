@@ -236,7 +236,7 @@ Run npm run test -- tests/domain/payment-state.test.ts tests/storage/payment-rep
 - Create: tests/parsers/husky-parser.test.ts
 - Create: entrypoints/background.ts
 
-- [ ] **Step 1: Define the shared parser and message contracts**
+- [x] **Step 1: Define the shared parser and message contracts**
 
 Put these exact contracts in src/shared/observed-payment.ts and src/shared/messages.ts so both portal adapters, the service worker, and storage use one shape:
 
@@ -291,31 +291,31 @@ Export a Zod schema named extensionMessageSchema matching ExtensionMessage and u
 
 Keep these contracts in their named files: ObservedPayment/ParseWarning/ParseResult in src/shared/observed-payment.ts, and ScanProgress/ExtensionMessage/extensionMessageSchema in src/shared/messages.ts. Side-panel scan controls send SCAN_CONTROL; the service worker broadcasts SCAN_PROGRESS. A supported content script sends PORTAL_LIST_DETECTED and PAYMENTS_OBSERVED. A confirmed issue review sends ISSUE_QUEUE_START, and the service worker broadcasts ISSUE_QUEUE_PROGRESS.
 
-- [ ] **Step 2: Parse Asaas rows and stable IDs**
+- [x] **Step 2: Parse Asaas rows and stable IDs**
 
 Implement a row selector and extract sourcePaymentId and payerName using only the selectors recorded in docs/integrations/asaas.md. Return an unsupported_layout warning when the expected list container is absent. When no portal ID exists, set sourcePaymentId to null and add missing_id; createRecordIdentity in the scan coordinator handles the composite key.
 
-- [ ] **Step 3: Parse Asaas money, date, status, and pagination**
+- [x] **Step 3: Parse Asaas money, date, status, and pagination**
 
 Add localized amount/date parsing and the exact source-status mapping from docs/integrations/asaas.md. Return unknown status as desconhecido and expose the typed pagination state without navigating. Run the Asaas parser test file against the sanitized fixture.
 
-- [ ] **Step 4: Parse Husky rows and stable IDs**
+- [x] **Step 4: Parse Husky rows and stable IDs**
 
 Implement a row selector and extract sourcePaymentId and payerName using only the selectors recorded in docs/integrations/husky.md. Return an unsupported_layout warning when the expected list container is absent. When no portal ID exists, set sourcePaymentId to null and add missing_id; createRecordIdentity handles the composite key.
 
-- [ ] **Step 5: Parse Husky money, date, status, and pagination**
+- [x] **Step 5: Parse Husky money, date, status, and pagination**
 
 Add localized amount/date parsing and the exact source-status mapping from docs/integrations/husky.md. Keep in-transit transfers pending; only the verified arrived/credited UI state maps to recebido. Expose typed pagination state without navigating.
 
-- [ ] **Step 6: Add fixture tests for both parsers**
+- [x] **Step 6: Add fixture tests for both parsers**
 
 Cover recognized statuses, pending versus received, unknown status, missing ID, localized amount formats, multiple rows, empty lists, and the distinct pagination results next/end/unsupported for both providers. Use only the sanitized HTML files. Run npm run test -- tests/parsers/asaas-parser.test.ts tests/parsers/husky-parser.test.ts.
 
-- [ ] **Step 7: Route observations through the service worker**
+- [x] **Step 7: Route observations through the service worker**
 
 Register WXT content scripts only on the supported payment-list routes. Send observed data to the background service worker; validate it; call payment-repository.upsertObservedPayments; and update the action badge with a count of newly received, undeclared payments.
 
-- [ ] **Step 8: Run parser tests and commit**
+- [x] **Step 8: Run parser tests and commit**
 
 Run npm run test -- tests/parsers/asaas-parser.test.ts tests/parsers/husky-parser.test.ts. Commit as feat: detect Asaas and Husky payments.
 
