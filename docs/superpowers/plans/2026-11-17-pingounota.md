@@ -580,31 +580,31 @@ Run npm run test and npm run build. Commit as feat: add local data backup and de
 - Modify: LICENSE
 - Modify: .gitignore
 
-- [ ] **Step 1: Write the public README in Portuguese**
+- [x] **Step 1: Write the public README in Portuguese**
 
 Document purpose, screenshots of synthetic data only, local-only storage, permissions and why they are needed, development installation by loading WXT's generated .output/chrome-mv3 directory as an unpacked extension (or installing the generated ZIP), Adaflow token setup, the difference between local marking and real issuance, the five-per-minute limit, known portal parsing limitations, and MIT license.
 
-- [ ] **Step 2: Add security and repository hygiene files**
+- [x] **Step 2: Add security and repository hygiene files**
 
 Add MIT full text with Copyright (c) 2026 raalarcon9705. Enable GitHub Private vulnerability reporting in repository settings and put https://github.com/raalarcon9705/PingouNota/security/advisories/new in SECURITY.md with the supported-version policy. Ignore .env*, local backup JSON, portal HTML dumps, browser profiles, generated .output/, node_modules/, and test coverage output. Add a bug report template that asks for sanitized steps and explicitly says not to attach tokens or customer data.
 
-- [ ] **Step 3: Add CI and run its exact local commands**
+- [x] **Step 3: Add CI and run its exact local commands**
 
 Configure GitHub Actions on pull requests and pushes to main with separate jobs named test and build. Both jobs run npm ci; test runs npm run test and build runs npm run build. Run these same commands locally and inspect the generated ZIP for source maps, tokens, backups, or real customer data.
 
-- [ ] **Step 4: Perform the authenticated Chrome acceptance pass**
+- [x] **Step 4: Perform the authenticated Chrome acceptance pass**
 
 Load the generated .output/chrome-mv3 directory in Chrome and, using the already-authenticated Asaas and Husky pages, confirm portal detection/badge, automatic first and incremental scans, full versus partial pagination status, pending/received eligibility, local mark and its disclaimer, reviewed single/batch Adaflow flow using a non-production credential/environment if available, progress/recovery states, and all pt-BR text. Use synthetic/authorized records and do not trigger a real NFSe without the user's separate release approval.
 
-- [ ] **Step 5: Create the public GitHub repository**
+- [x] **Step 5: Create the public GitHub repository**
 
 Using the connected GitHub account raalarcon9705, create public repository PingouNota with description Extensão Chrome para acompanhar pagamentos e emitir NFSe pela Adaflow, MIT license, and default branch main. Enable Issues and Private vulnerability reporting. Do not enable Discussions or GitHub Pages for the MVP. Push the local main branch, verify README/license visibility, and confirm no secrets or real payment data were committed.
 
-- [ ] **Step 6: Protect the main branch**
+- [x] **Step 6: Protect the main branch**
 
 After the first CI run publishes the check names test and build, configure a ruleset for main that blocks force pushes and requires both checks before merging. Confirm that the ruleset is active and does not require multiple reviewers for the single-maintainer MVP.
 
-- [ ] **Step 7: Record the published repository URL and final commit**
+- [x] **Step 7: Record the published repository URL and final commit**
 
 Update the local README with the repository URL if needed, commit as docs: prepare PingouNota for public release, push main, and report the GitHub URL and commit ID.
 
