@@ -6,6 +6,7 @@ import {
   updateActionBadge,
 } from '../src/services/scan-coordinator';
 import { emissionQueue } from '../src/services/adaflow/emission-queue';
+import { reconcileAdaflowDeclarations } from '../src/services/adaflow-reconciliation';
 
 export default defineBackground(() => {
   const setupStorageSecurity = async () => {
@@ -154,6 +155,20 @@ export default defineBackground(() => {
           })
           .catch((error) => {
             console.error('[PingouNota] Error processing issue queue:', error);
+            sendResponse({ success: false, error: String(error) });
+          });
+
+        return true;
+      }
+
+      if (validMessage.type === 'ADAFLOW_RECONCILIATION_OBSERVED') {
+        reconcileAdaflowDeclarations(validMessage.declarations)
+          .then(async ({ matchedCount, updatedCount }) => {
+            await updateActionBadge();
+            sendResponse({ success: true, matchedCount, updatedCount });
+          })
+          .catch((error) => {
+            console.error('[PingouNota] Error during Adaflow reconciliation:', error);
             sendResponse({ success: false, error: String(error) });
           });
 

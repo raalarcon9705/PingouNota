@@ -18,7 +18,18 @@ export type ExtensionMessage =
   | { type: 'SCAN_CONTROL'; action: 'start' | 'pause' | 'cancel'; scanId?: string; provider: PaymentProvider }
   | { type: 'SCAN_PROGRESS'; progress: ScanProgress }
   | { type: 'ISSUE_QUEUE_START'; operationIds: string[] }
-  | { type: 'ISSUE_QUEUE_PROGRESS'; operationIds: string[] };
+  | { type: 'ISSUE_QUEUE_PROGRESS'; operationIds: string[] }
+  | {
+      type: 'ADAFLOW_RECONCILIATION_OBSERVED';
+      declarations: Array<{
+        asaasPaymentId: string;
+        adaflowNfseId: number;
+        nfseNumber?: string;
+        date?: string;
+        amountCents?: number;
+        pdfUrl?: string;
+      }>;
+    };
 
 export const extensionMessageSchema = z.discriminatedUnion('type', [
   z.object({
@@ -83,5 +94,18 @@ export const extensionMessageSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('ISSUE_QUEUE_PROGRESS'),
     operationIds: z.array(z.string()),
+  }),
+  z.object({
+    type: z.literal('ADAFLOW_RECONCILIATION_OBSERVED'),
+    declarations: z.array(
+      z.object({
+        asaasPaymentId: z.string(),
+        adaflowNfseId: z.number(),
+        nfseNumber: z.string().optional(),
+        date: z.string().optional(),
+        amountCents: z.number().optional(),
+        pdfUrl: z.string().optional(),
+      }),
+    ),
   }),
 ]);
