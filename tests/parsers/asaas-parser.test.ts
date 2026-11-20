@@ -324,5 +324,45 @@ describe('Asaas Payments Parser', () => {
       expect(result.payments[8]?.paymentState).toBe('aguardando_recebimento');
       expect(result.payments[8]?.amountCents).toBe(1190);
     });
+
+    it('parses raw AJAX fragment where atlas-table-col lacks column-label attributes', () => {
+      const ajaxHtml = `
+        <atlas-table-row data-payment-id="pay_ajax_001" href="/payment/show/pay_ajax_001">
+          <atlas-table-col>
+            <atlas-layout>
+              <atlas-icon name="user-filled"></atlas-icon>
+              <atlas-text>Empresa Alpha Ltda</atlas-text>
+            </atlas-layout>
+          </atlas-table-col>
+          <atlas-table-col>
+            <atlas-layout>R$ 150,50</atlas-layout>
+          </atlas-table-col>
+          <atlas-table-col>Serviços de Consultoria</atlas-table-col>
+          <atlas-table-col>Pix</atlas-table-col>
+          <atlas-table-col>
+            <atlas-layout>
+              25/11/2026
+              <atlas-icon name="check-filled" tooltip="Recebida em 24/11/2026"></atlas-icon>
+            </atlas-layout>
+          </atlas-table-col>
+        </atlas-table-row>
+      `;
+      const doc = createDocument(ajaxHtml);
+      const result = parseAsaasPayments(doc);
+
+      expect(result.payments).toHaveLength(1);
+      expect(result.payments[0]).toEqual({
+        provider: 'asaas',
+        sourcePaymentId: 'pay_ajax_001',
+        identityConfidence: 'high',
+        payerName: 'Empresa Alpha Ltda',
+        amountCents: 15050,
+        currency: 'BRL',
+        paymentDate: '2026-11-25',
+        sourceStatus: 'Recebida em 24/11/2026',
+        paymentState: 'recebido',
+      });
+      expect(result.warnings).toHaveLength(0);
+    });
   });
 });

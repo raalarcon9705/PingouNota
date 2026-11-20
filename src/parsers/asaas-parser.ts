@@ -135,10 +135,15 @@ export function parseAsaasPayments(document: Document): ParseResult {
         });
       }
 
+      const cols = Array.from(row.querySelectorAll('atlas-table-col'));
+
       let payerName: string | null = null;
-      const nameCol = row.querySelector(
-        'atlas-table-col[column-label="Nome"], atlas-table-col[column-label="nome"], atlas-table-col.js-customer-account-name',
-      );
+      const nameCol =
+        row.querySelector(
+          'atlas-table-col[column-label="Nome" i], atlas-table-col.js-customer-account-name',
+        ) ||
+        cols.find((c) => c.getAttribute('column-label')?.toLowerCase() === 'nome') ||
+        cols[0];
       if (nameCol) {
         const textEl = nameCol.querySelector('atlas-text');
         if (textEl?.textContent?.trim()) {
@@ -151,9 +156,13 @@ export function parseAsaasPayments(document: Document): ParseResult {
       }
       if (payerName === '') payerName = null;
 
-      const amountCol = row.querySelector(
-        'atlas-table-col[column-label="Valor"], atlas-table-col[column-label="valor"], atlas-table-col.js-payment-value',
-      );
+      const amountCol =
+        row.querySelector(
+          'atlas-table-col[column-label="Valor" i], atlas-table-col.js-payment-value',
+        ) ||
+        cols.find((c) => c.getAttribute('column-label')?.toLowerCase() === 'valor') ||
+        cols.find((c) => c.textContent?.includes('R$')) ||
+        cols[1];
       const rawAmount = amountCol?.textContent?.trim();
       const amountCents = parseBrlAmountToCents(rawAmount);
       if (amountCents === null) {
@@ -164,12 +173,16 @@ export function parseAsaasPayments(document: Document): ParseResult {
         });
       }
 
-      const dateCol = row.querySelector(
-        'atlas-table-col[column-label="Data de vencimento"], atlas-table-col[column-label="data de vencimento"], atlas-table-col.js-payment-due-date',
-      );
+      const dateCol =
+        row.querySelector(
+          'atlas-table-col[column-label*="vencimento" i], atlas-table-col.js-payment-due-date',
+        ) ||
+        cols.find((c) => c.getAttribute('column-label')?.toLowerCase().includes('vencimento')) ||
+        cols.find((c) => /(\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{4}-\d{2}-\d{2})/.test(c.textContent || '')) ||
+        cols[4];
       const rawDate = dateCol?.textContent?.trim();
       const dateMatch = rawDate?.match(/(\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{4}-\d{2}-\d{2})/);
-      const paymentDate = parseDateToIso(dateMatch ? dateMatch[0] : rawDate);
+      let paymentDate = parseDateToIso(dateMatch ? dateMatch[0] : rawDate);
 
       let statusIcon = dateCol?.querySelector(
         'atlas-icon[name="clock-filled"], atlas-icon[name="check-filled"], atlas-icon[name="x-filled"], atlas-icon[theme="warning"], atlas-icon[theme="success"], atlas-icon[theme="danger"]',
@@ -182,6 +195,12 @@ export function parseAsaasPayments(document: Document): ParseResult {
       }
 
       const sourceStatus = statusIcon?.getAttribute('tooltip')?.trim() || '';
+      if (!paymentDate && sourceStatus) {
+        const statusDateMatch = sourceStatus.match(/(\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{4}-\d{2}-\d{2})/);
+        if (statusDateMatch) {
+          paymentDate = parseDateToIso(statusDateMatch[0]);
+        }
+      }
       const paymentState = normalizePaymentState(sourceStatus, 'asaas');
       if (paymentState === 'desconhecido') {
         warnings.push({
