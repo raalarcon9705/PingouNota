@@ -1,11 +1,12 @@
 :root {
   color-scheme: light dark;
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI',
-    Roboto, Helvetica, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text',
+    'Helvetica Neue', Arial, sans-serif;
   font-size: 14px;
   line-height: 1.5;
   font-synthesis: none;
 
+  /* 8pt Spacing Grid */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -13,32 +14,44 @@
   --space-5: 20px;
   --space-6: 24px;
 
-  --color-background: #f2f2f7;
-  --color-surface: #ffffff;
-  --color-surface-hover: #f9f9fb;
-  --color-surface-selected: #eef6ff;
-  --color-text: #1c1c1e;
-  --color-text-secondary: #636366;
-  --color-text-muted: #8e8e93;
-  --color-separator: #d1d1d6;
-  --color-border: #e5e5ea;
+  /* Apple System Colors - Light Mode */
+  --system-blue: #007AFF;
+  --system-green: #34C759;
+  --system-orange: #FF9500;
+  --system-red: #FF3B30;
+  --system-gray: #8E8E93;
+  --system-gray5: #E5E5EA;
+  --system-gray6: #F2F2F7;
+  --label-primary: #000000;
+  --label-secondary: rgba(60, 60, 67, 0.6);
+  --label-tertiary: rgba(60, 60, 67, 0.3);
 
-  --color-accent: #0066cc;
-  --color-accent-hover: #0052a3;
-  --color-focus: #0066cc;
+  --color-background: #F2F2F7;
+  --color-surface: #FFFFFF;
+  --color-surface-hover: #F9F9FB;
+  --color-surface-selected: #EEF6FF;
+  --color-text: #1C1C1E;
+  --color-text-secondary: rgba(60, 60, 67, 0.6);
+  --color-text-muted: #8E8E93;
+  --color-separator: #C6C6C8;
+  --color-border: #E5E5EA;
 
-  --color-success: #34c759;
-  --color-success-bg: #e8f8ec;
-  --color-warning: #ff9500;
-  --color-warning-bg: #fff5e6;
-  --color-danger: #ff3b30;
-  --color-danger-bg: #ffebeb;
-  --color-info: #007aff;
-  --color-info-bg: #e6f2ff;
+  --color-accent: #007AFF;
+  --color-accent-hover: #0062CC;
+  --color-focus: #007AFF;
 
-  --radius-card: 12px;
-  --radius-badge: 6px;
-  --radius-input: 8px;
+  --color-success: #34C759;
+  --color-success-bg: #E8F8EC;
+  --color-warning: #FF9500;
+  --color-warning-bg: #FFF5E6;
+  --color-danger: #FF3B30;
+  --color-danger-bg: #FFEBEB;
+  --color-info: #007AFF;
+  --color-info-bg: #E6F2FF;
+
+  --radius-card: 16px;
+  --radius-badge: 9999px;
+  --radius-input: 12px;
 
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
   --shadow-float: 0 -2px 10px rgba(0, 0, 0, 0.1);
@@ -46,28 +59,40 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
+    /* Apple System Colors - Dark Mode */
+    --system-blue: #0A84FF;
+    --system-green: #30D158;
+    --system-orange: #FF9F0A;
+    --system-red: #FF453A;
+    --system-gray: #8E8E93;
+    --system-gray5: #2C2C2E;
+    --system-gray6: #1C1C1E;
+    --label-primary: #FFFFFF;
+    --label-secondary: rgba(235, 235, 245, 0.6);
+    --label-tertiary: rgba(235, 235, 245, 0.3);
+
     --color-background: #000000;
-    --color-surface: #1c1c1e;
-    --color-surface-hover: #2c2c2e;
-    --color-surface-selected: #172d47;
-    --color-text: #f2f2f7;
-    --color-text-secondary: #aeaeb2;
-    --color-text-muted: #8e8e93;
-    --color-separator: #38383a;
-    --color-border: #2c2c2e;
+    --color-surface: #1C1C1E;
+    --color-surface-hover: #2C2C2E;
+    --color-surface-selected: #172D47;
+    --color-text: #F2F2F7;
+    --color-text-secondary: rgba(235, 235, 245, 0.6);
+    --color-text-muted: #8E8E93;
+    --color-separator: #38383A;
+    --color-border: #2C2C2E;
 
-    --color-accent: #64b5ff;
-    --color-accent-hover: #82c4ff;
-    --color-focus: #64b5ff;
+    --color-accent: #0A84FF;
+    --color-accent-hover: #409CFF;
+    --color-focus: #0A84FF;
 
-    --color-success: #30d158;
-    --color-success-bg: #12331b;
-    --color-warning: #ff9f0a;
+    --color-success: #30D158;
+    --color-success-bg: #12331B;
+    --color-warning: #FF9F0A;
     --color-warning-bg: #382405;
-    --color-danger: #ff453a;
-    --color-danger-bg: #3b1414;
-    --color-info: #0a84ff;
-    --color-info-bg: #0d2744;
+    --color-danger: #FF453A;
+    --color-danger-bg: #3B1414;
+    --color-info: #0A84FF;
+    --color-info-bg: #0D2744;
 
     --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
     --shadow-float: 0 -2px 12px rgba(0, 0, 0, 0.5);
@@ -309,17 +334,22 @@ h3 {
   align-items: center;
   justify-content: center;
   min-height: 44px;
-  padding: 0 var(--space-3);
-  border-radius: var(--radius-input);
+  padding: 0 var(--space-4);
+  border-radius: 9999px;
   font-weight: 600;
   font-size: 0.85rem;
   border: 1px solid transparent;
-  transition: background-color 0.15s ease, opacity 0.15s ease;
+  transition: background-color 0.15s ease, transform 0.15s cubic-bezier(0.25, 0.1, 0.25, 1), opacity 0.15s ease;
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .btn-primary {
-  background: var(--color-accent);
+  background: var(--system-blue);
   color: #ffffff;
+  border-radius: 9999px;
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -329,7 +359,8 @@ h3 {
 .btn-secondary {
   background: var(--color-surface);
   color: var(--color-text);
-  border-color: var(--color-separator);
+  border: 1px solid var(--color-separator);
+  border-radius: 9999px;
 }
 
 .btn-secondary:hover:not(:disabled) {
@@ -650,17 +681,20 @@ h3 {
 }
 
 .tab-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
   color: var(--color-text-secondary);
   font-weight: 500;
   font-size: 0.875rem;
-  padding: var(--space-3) var(--space-3);
+  padding: var(--space-2) var(--space-3);
   cursor: pointer;
   white-space: nowrap;
   transition: color 0.15s ease, border-color 0.15s ease;
-  min-height: 40px;
+  min-height: 44px;
 }
 
 .tab-btn:hover {
@@ -671,6 +705,130 @@ h3 {
   color: var(--color-accent);
   border-bottom-color: var(--color-accent);
   font-weight: 600;
+}
+
+.tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  background-color: var(--system-red);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 9999px;
+  margin-left: var(--space-1);
+  line-height: 1;
+}
+
+/* Apple HIG Proposal Section & Cards */
+.proposal-section {
+  margin-bottom: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-separator);
+  border-radius: 16px;
+  padding: var(--space-4);
+  box-shadow: var(--shadow-sm);
+}
+
+.proposal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.proposal-header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.proposal-pill-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background-color: var(--color-warning-bg);
+  color: var(--system-orange);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.proposal-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.proposal-card {
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.proposal-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.proposal-card-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+.proposal-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: var(--color-surface-hover);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-separator);
+}
+
+.proposal-meta {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.proposal-meta-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.proposal-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.proposal-actions .btn {
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  font-size: 0.8rem;
 }
 
 .tab-content {

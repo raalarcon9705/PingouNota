@@ -2,6 +2,7 @@ import {
   parseAdaflowInvoicesPage,
   parseAdaflowSlideover,
 } from '../parsers/adaflow-parser';
+import type { TakerProfile } from '../domain/taker';
 
 export interface AdaflowReconciledDeclaration {
   asaasPaymentId: string;
@@ -16,6 +17,20 @@ export interface AdaflowReconciledDeclaration {
 export interface AdaflowImportedTaker {
   serviceTakerId?: string;
   name: string;
+  document?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  address?: TakerProfile['address'];
+  discoveredFromNfse?: string;
+}
+
+export interface AdaflowImportedTemplate {
+  id?: string;
+  name: string;
+  description: string;
+  cnae?: string;
+  withholdTaxes?: boolean;
+  discoveredFromNfse?: string;
 }
 
 export interface FetchAdaflowDeclarationsOptions {
@@ -29,6 +44,7 @@ export type FetchAdaflowDeclarationsResult = AdaflowReconciledDeclaration[] & {
   pagesScanned: number;
   totalInvoicesFound: number;
   takers: AdaflowImportedTaker[];
+  templates: AdaflowImportedTemplate[];
 };
 
 /**
@@ -59,6 +75,7 @@ export async function fetchAdaflowDeclarations(
   const visited = new Set<string>();
   const reconciledDeclarations: AdaflowReconciledDeclaration[] = [];
   const uniqueTakersMap = new Map<string, AdaflowImportedTaker>();
+  const uniqueTemplatesMap = new Map<string, AdaflowImportedTemplate>();
   const allScannedNotes: Array<{
     adaflowNfseId: number;
     nfseNumber?: string;
@@ -120,6 +137,8 @@ export async function fetchAdaflowDeclarations(
     }
 
     for (const invoice of invoices) {
+      const nfseIdentifier = invoice.nfseNumber || `ID ${invoice.adaflowNfseId}`;
+
       if (invoice.takerName && invoice.takerName.trim()) {
         const name = invoice.takerName.trim();
         const key = invoice.serviceTakerId || name.toLowerCase();
@@ -127,6 +146,7 @@ export async function fetchAdaflowDeclarations(
           uniqueTakersMap.set(key, {
             serviceTakerId: invoice.serviceTakerId,
             name,
+            discoveredFromNfse: nfseIdentifier,
           });
         }
       }
@@ -159,6 +179,53 @@ export async function fetchAdaflowDeclarations(
 
         const detailHtml = await detailResponse.text();
         const slideoverDetail = parseAdaflowSlideover(detailHtml);
+
+        // Merge enriched taker details from slideover
+        const takerName = slideoverDetail.taker?.name || invoice.takerName?.trim();
+        if (takerName) {
+          const key = invoice.serviceTakerId || takerName.toLowerCase();
+          const existing = uniqueTakersMap.get(key) || {
+            serviceTakerId: invoice.serviceTakerId,
+            name: takerName,
+          };
+
+          uniqueTakersMap.set(key, {
+            ...existing,
+            serviceTakerId: existing.serviceTakerId || invoice.serviceTakerId,
+            name: takerName,
+            document: slideoverDetail.taker?.document ?? existing.document ?? null,
+            email: slideoverDetail.taker?.email ?? existing.email ?? null,
+            phone: slideoverDetail.taker?.phone ?? existing.phone ?? null,
+            address: slideoverDetail.taker?.address ?? existing.address,
+            discoveredFromNfse: existing.discoveredFromNfse || nfseIdentifier,
+          });
+        }
+
+        // Discover template candidates from slideover description if meaningful (>15 chars)
+        if (slideoverDetail.description && slideoverDetail.description.trim().length > 15) {
+          const rawDesc = slideoverDetail.description.trim();
+          const cleanedDesc = rawDesc
+            .replace(/[-–—,]?\s*referente [aà] cobran[çc]a Asaas\s*(?:n[º°o\.]|num\.?|#)?\s*[0-9][0-9\.\s\-_/]*[0-9]?/gi, '')
+            .replace(/[-–—,]?\s*cobran[çc]a Asaas\s*(?:n[º°o\.]|num\.?|#)?\s*[0-9][0-9\.\s\-_/]*[0-9]?/gi, '')
+            .replace(/[-–—,]?\s*Asaas\s*(?:n[º°o\.]|num\.?|#)?\s*[0-9][0-9\.\s\-_/]*[0-9]?/gi, '')
+            .replace(/\s{2,}/g, ' ')
+            .trim()
+            .replace(/[,\-–—\.\s]+$/, '');
+
+          const descCandidate = cleanedDesc.length >= 10 ? cleanedDesc : rawDesc;
+          const firstLine = descCandidate.split('\n')[0] || descCandidate;
+          const shortName = firstLine.length > 40 ? firstLine.slice(0, 37) + '...' : firstLine;
+          const templateName = `Modelo - ${shortName}`;
+          const templateKey = descCandidate.toLowerCase();
+
+          if (!uniqueTemplatesMap.has(templateKey)) {
+            uniqueTemplatesMap.set(templateKey, {
+              name: templateName,
+              description: descCandidate,
+              discoveredFromNfse: nfseIdentifier,
+            });
+          }
+        }
 
         const hasAsaasId = Boolean(slideoverDetail.asaasPaymentId);
         allScannedNotes.push({
@@ -222,7 +289,7 @@ export async function fetchAdaflowDeclarations(
   console.table(summary);
   console.groupEnd();
 
-  console.group('📋 Detalhe das Notas Fiscais Escaneadas');
+  console.group('[PingouNota:Adaflow] 📋 Detalhe das Notas Fiscais Escaneadas');
   console.table(
     allScannedNotes.map((n) => ({
       'NFSe Nº': n.nfseNumber || `ID ${n.adaflowNfseId}`,
@@ -235,12 +302,14 @@ export async function fetchAdaflowDeclarations(
   console.groupEnd();
 
   const takers = Array.from(uniqueTakersMap.values());
+  const templates = Array.from(uniqueTemplatesMap.values());
 
   const result = Object.assign(reconciledDeclarations, {
     declarations: reconciledDeclarations,
     pagesScanned: pagesFetched,
     totalInvoicesFound: allScannedNotes.length,
     takers,
+    templates,
   });
 
   return result as FetchAdaflowDeclarationsResult;

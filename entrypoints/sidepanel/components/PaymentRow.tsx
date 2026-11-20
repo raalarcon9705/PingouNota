@@ -29,7 +29,7 @@ export function getSelectionEligibility(payment: Payment): SelectionEligibility 
     return { selectable: false, reason: 'Emissão em andamento' };
   }
   if (payment.declarationState === 'falha_adaflow') {
-    return { selectable: false, reason: 'Emissão anterior falhou - verificar detalhes' };
+    return { selectable: true };
   }
   if (payment.declarationState === 'cancelada_adaflow') {
     return { selectable: false, reason: 'Declaração cancelada' };

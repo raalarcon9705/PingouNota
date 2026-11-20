@@ -6,6 +6,12 @@ import {
   saveTemplate,
 } from '../../../src/services/templates';
 import { db, type PingouNotaDB } from '../../../src/storage/database';
+import {
+  getProposedTemplates,
+  approveProposedTemplate,
+  dismissProposedTemplate,
+  type ProposedTemplate,
+} from '../../../src/services/adaflow-reconciliation';
 import TemplateEditor from '../components/TemplateEditor';
 
 export interface TemplatesScreenProps {
@@ -18,18 +24,24 @@ export const TemplatesScreen: React.FC<TemplatesScreenProps> = ({
   onSelectTemplate,
 }) => {
   const [templates, setTemplates] = useState<ServiceTemplate[]>([]);
+  const [proposals, setProposals] = useState<ProposedTemplate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editingTemplate, setEditingTemplate] = useState<
     ServiceTemplate | null | 'new'
   >(null);
+  const [reviewingProposalId, setReviewingProposalId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
   const loadTemplates = useCallback(async () => {
     try {
       setIsLoading(true);
-      const items = await listTemplates(dbInstance);
+      const [items, proposedItems] = await Promise.all([
+        listTemplates(dbInstance),
+        getProposedTemplates(),
+      ]);
       setTemplates(items);
+      setProposals(proposedItems);
     } catch (err) {
       console.error('[PingouNota] Falha ao listar modelos:', err);
       setFeedbackMessage('Falha ao carregar modelos cadastrados.');
@@ -43,17 +55,43 @@ export const TemplatesScreen: React.FC<TemplatesScreenProps> = ({
   }, [loadTemplates]);
 
   const handleCreateNew = () => {
+    setReviewingProposalId(null);
     setEditingTemplate('new');
     setFeedbackMessage(null);
   };
 
   const handleEdit = (tmpl: ServiceTemplate) => {
+    setReviewingProposalId(null);
     setEditingTemplate(tmpl);
     setFeedbackMessage(null);
   };
 
+  const handleReviewProposal = (proposal: ProposedTemplate) => {
+    setReviewingProposalId(proposal.id);
+    setEditingTemplate({
+      id: proposal.id,
+      name: proposal.name,
+      cnae: proposal.cnae || '6201-5/01',
+      description: proposal.description,
+      withholdTaxes: proposal.withholdTaxes ?? false,
+      forwardingEmail: null,
+    });
+    setFeedbackMessage(null);
+  };
+
+  const handleDismissProposal = async (id: string) => {
+    await dismissProposedTemplate(id);
+    setFeedbackMessage('Sugestão de modelo descartada.');
+    await loadTemplates();
+  };
+
   const handleSave = async (saved: ServiceTemplate) => {
-    await saveTemplate(saved, dbInstance);
+    if (reviewingProposalId) {
+      await approveProposedTemplate(reviewingProposalId, saved, dbInstance);
+      setReviewingProposalId(null);
+    } else {
+      await saveTemplate(saved, dbInstance);
+    }
     setEditingTemplate(null);
     setFeedbackMessage('Modelo de serviço salvo com sucesso!');
     await loadTemplates();
@@ -114,10 +152,73 @@ export const TemplatesScreen: React.FC<TemplatesScreenProps> = ({
         <TemplateEditor
           initialTemplate={editingTemplate === 'new' ? null : editingTemplate}
           onSave={handleSave}
-          onCancel={() => setEditingTemplate(null)}
+          onCancel={() => {
+            setEditingTemplate(null);
+            setReviewingProposalId(null);
+          }}
         />
       ) : (
         <div className="templates-list-section">
+          {/* Sugestões da Adaflow */}
+          {proposals.length > 0 && (
+            <section className="proposal-section" data-testid="proposed-templates-section">
+              <div className="proposal-header">
+                <h3>
+                  Modelos sugeridos da Adaflow
+                  <span className="proposal-pill-badge" data-testid="proposals-count">
+                    {proposals.length}
+                  </span>
+                </h3>
+              </div>
+              <div className="proposal-list">
+                {proposals.map((prop) => (
+                  <div
+                    key={prop.id}
+                    className="proposal-card"
+                    data-testid={`proposal-template-${prop.id}`}
+                  >
+                    <div className="proposal-card-header">
+                      <span className="proposal-card-title">{prop.name}</span>
+                      {prop.cnae && (
+                        <span className="proposal-badge">CNAE: {prop.cnae}</span>
+                      )}
+                    </div>
+                    <p className="item-description-text" style={{ margin: '4px 0' }}>
+                      {prop.description.length > 120
+                        ? prop.description.slice(0, 117) + '...'
+                        : prop.description}
+                    </p>
+                    <div className="proposal-meta">
+                      {prop.discoveredFromNfse && (
+                        <div className="proposal-meta-row">
+                          <strong>Origem:</strong> {prop.discoveredFromNfse}
+                        </div>
+                      )}
+                    </div>
+                    <div className="proposal-actions">
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => handleReviewProposal(prop)}
+                        data-testid={`btn-review-proposal-${prop.id}`}
+                      >
+                        Revisar e Salvar
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => handleDismissProposal(prop.id)}
+                        data-testid={`btn-dismiss-proposal-${prop.id}`}
+                      >
+                        Descartar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
           {isLoading ? (
             <div className="loading-state">
               <span className="spinner" aria-hidden="true" />

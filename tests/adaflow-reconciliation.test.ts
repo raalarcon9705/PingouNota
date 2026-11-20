@@ -348,10 +348,36 @@ describe('Adaflow Reconciliation Service', () => {
       expect(declarations.pagesScanned).toBe(2);
       expect(declarations.totalInvoicesFound).toBe(3);
       expect(declarations.takers).toEqual([
-        { serviceTakerId: undefined, name: 'Empresa A' },
-        { serviceTakerId: undefined, name: 'Empresa B' },
-        { serviceTakerId: undefined, name: 'Empresa C' },
+        {
+          serviceTakerId: undefined,
+          name: 'Empresa A',
+          document: null,
+          email: null,
+          phone: null,
+          address: undefined,
+          discoveredFromNfse: 'Nº 10',
+        },
+        {
+          serviceTakerId: undefined,
+          name: 'Empresa B',
+          document: null,
+          email: null,
+          phone: null,
+          address: undefined,
+          discoveredFromNfse: 'Nº 11',
+        },
+        {
+          serviceTakerId: undefined,
+          name: 'Empresa C',
+          document: null,
+          email: null,
+          phone: null,
+          address: undefined,
+          discoveredFromNfse: 'Nº 12',
+        },
       ]);
+      expect(declarations.templates).toHaveLength(3);
+      expect(declarations.templates[0]?.discoveredFromNfse).toBe('Nº 10');
 
       // Verify scraper logs
       expect(infoSpy).toHaveBeenCalledWith(

@@ -6,6 +6,7 @@ export interface TakerProfile {
   document: string | null;
   externalId: string | null;
   email: string | null;
+  phone?: string | null;
   address: {
     line1: string;
     number: string | null;
@@ -24,6 +25,7 @@ export interface AdaflowServiceTaker {
   external_id?: string;
   name?: string;
   email?: string;
+  phone?: string | null;
   address?: {
     line1: string;
     number?: string;
@@ -117,6 +119,7 @@ export const takerProfileSchema = z.object({
       message: 'E-mail inválido',
     })
     .default(null),
+  phone: z.string().nullable().optional().default(null),
   address: takerAddressSchema,
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
@@ -147,6 +150,7 @@ export const adaflowServiceTakerSchema = z.object({
     .refine((val) => val === undefined || val === '' || z.string().email().safeParse(val).success, {
       message: 'E-mail inválido',
     }),
+  phone: z.string().nullable().optional(),
   address: adaflowAddressSchema.optional(),
 });
 

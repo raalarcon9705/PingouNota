@@ -39,16 +39,21 @@ export default defineContentScript({
       try {
         pill = createOrUpdatePill('PingouNota: Sincronizando notas fiscais emitidas...');
 
-        const { declarations, pagesScanned, totalInvoicesFound, takers } =
+        const { declarations, pagesScanned, totalInvoicesFound, takers, templates } =
           await fetchAdaflowDeclarations();
 
-        if (declarations.length > 0 || (takers && takers.length > 0)) {
+        if (
+          declarations.length > 0 ||
+          (takers && takers.length > 0) ||
+          (templates && templates.length > 0)
+        ) {
           const message: ExtensionMessage = {
             type: 'ADAFLOW_RECONCILIATION_OBSERVED',
             declarations,
             pagesScanned,
             totalInvoicesFound,
             takers,
+            templates,
           };
 
           const response = (await browser.runtime.sendMessage(message)) as {

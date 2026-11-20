@@ -218,5 +218,74 @@ describe('Adaflow Parser', () => {
       expect(detail.asaasPaymentId).toBeNull();
       expect(detail.description).toBe('Prestação de serviços avulsos de design gráfico.');
     });
+
+    it('extracts complete taker information from slideover HTML', () => {
+      const slideoverHtml = `
+        <turbo-frame id="slideover_body">
+          <div data-field="description">Serviço referente à cobrança Asaas nº 12345678</div>
+          <div data-section="taker">
+            <h3 data-field="taker_name">ACME Corporation Ltda</h3>
+            <span data-field="taker_document">12.345.678/0001-90</span>
+            <a data-field="taker_email" href="mailto:contato@acme.com.br">contato@acme.com.br</a>
+            <a data-field="taker_phone" href="tel:+5511987654321">(11) 98765-4321</a>
+            <div data-field="taker_address">
+              <span data-field="address_line1">Av. Brigadeiro Faria Lima</span>
+              <span data-field="address_number">1000</span>
+              <span data-field="address_neighborhood">Itaim Bibi</span>
+              <span data-field="address_city">São Paulo</span>
+              <span data-field="address_state">SP</span>
+              <span data-field="address_postal_code">01452-001</span>
+              <span data-field="address_country">BR</span>
+            </div>
+          </div>
+        </turbo-frame>
+      `;
+
+      const detail = parseAdaflowSlideover(slideoverHtml);
+      expect(detail.asaasPaymentId).toBe('12345678');
+      expect(detail.taker).toBeDefined();
+      expect(detail.taker?.name).toBe('ACME Corporation Ltda');
+      expect(detail.taker?.document).toBe('12.345.678/0001-90');
+      expect(detail.taker?.email).toBe('contato@acme.com.br');
+      expect(detail.taker?.phone).toBe('+5511987654321');
+      expect(detail.taker?.address).toEqual({
+        line1: 'Av. Brigadeiro Faria Lima',
+        number: '1000',
+        neighborhood: 'Itaim Bibi',
+        city: 'São Paulo',
+        state: 'SP',
+        postalCode: '01452-001',
+        country: 'BR',
+      });
+    });
+
+    it('extracts taker info with text pattern matching when data-field attributes are absent', () => {
+      const slideoverHtml = `
+        <turbo-frame id="slideover_body">
+          <div class="service-description">Desenvolvimento web referente à cobrança Asaas 88776655</div>
+          <div class="taker-section">
+            <p class="taker-name">João da Silva</p>
+            <p>CPF: 123.456.789-01</p>
+            <p>E-mail: joao@silva.com</p>
+            <p>Telefone: (21) 99887-6655</p>
+            <p class="taker-address">Rua das Acácias, 50, Tijuca, Rio de Janeiro - RJ, 20510-000</p>
+          </div>
+        </turbo-frame>
+      `;
+
+      const detail = parseAdaflowSlideover(slideoverHtml);
+      expect(detail.asaasPaymentId).toBe('88776655');
+      expect(detail.taker).toBeDefined();
+      expect(detail.taker?.name).toBe('João da Silva');
+      expect(detail.taker?.document).toBe('123.456.789-01');
+      expect(detail.taker?.email).toBe('joao@silva.com');
+      expect(detail.taker?.phone).toBe('(21) 99887-6655');
+      expect(detail.taker?.address).toBeDefined();
+      expect(detail.taker?.address?.line1).toBe('Rua das Acácias');
+      expect(detail.taker?.address?.number).toBe('50');
+      expect(detail.taker?.address?.city).toBe('Rio de Janeiro');
+      expect(detail.taker?.address?.state).toBe('RJ');
+      expect(detail.taker?.address?.postalCode).toBe('20510-000');
+    });
   });
 });

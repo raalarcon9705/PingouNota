@@ -23,9 +23,26 @@ export interface AdaflowInvoicesPageResult {
   pagination: AdaflowParsedPagination;
 }
 
+export interface AdaflowSlideoverTaker {
+  name?: string;
+  document?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  address?: {
+    line1: string;
+    number: string | null;
+    neighborhood: string | null;
+    city: string;
+    state: string;
+    postalCode: string;
+    country: string;
+  };
+}
+
 export interface AdaflowSlideoverDetail {
   asaasPaymentId: string | null;
   description?: string;
+  taker?: AdaflowSlideoverTaker;
 }
 
 function resolveDocument(htmlOrDoc: string | Document | Element): Document | Element {
@@ -60,7 +77,10 @@ export function extractAsaasPaymentId(text: string | null | undefined): string |
       if (cleaned.length >= 7) {
         return cleaned;
       }
-      const fallbackMatch = text.match(/(?:^|\D)(\d{8,12})(?:\D|$)/);
+      // Constrain fallback to the context near the Asaas mention
+      const contextStartIndex = Math.max(0, (match.index ?? 0) - 20);
+      const nearbyContext = text.slice(contextStartIndex, (match.index ?? 0) + match[0].length + 50);
+      const fallbackMatch = nearbyContext.match(/(?:^|\D)(\d{8,12})(?:\D|$)/);
       if (fallbackMatch && fallbackMatch[1]) {
         return fallbackMatch[1];
       }
@@ -74,13 +94,6 @@ export function extractAsaasPaymentId(text: string | null | undefined): string |
   const trimmed = text.trim();
   if (/^[0-9][0-9\.\s\-_/]*[0-9]$|^\d+$/.test(trimmed)) {
     const cleaned = trimmed.replace(/\D/g, '');
-    if (cleaned.length >= 7) {
-      return cleaned;
-    }
-    const fallbackMatch = text.match(/(?:^|\D)(\d{8,12})(?:\D|$)/);
-    if (fallbackMatch && fallbackMatch[1]) {
-      return fallbackMatch[1];
-    }
     if (cleaned.length > 0) {
       return cleaned;
     }
@@ -234,6 +247,86 @@ export function parseAdaflowInvoicesPage(htmlOrDoc: string | Document): AdaflowI
   };
 }
 
+function extractAddressFromScope(scope: Element | Document): {
+  line1: string;
+  number: string | null;
+  neighborhood: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+} | undefined {
+  const line1El = scope.querySelector(
+    '[data-field="taker_address_line1"], [data-field="address_line1"], [data-field="logradouro"], .address-line1',
+  );
+  const numberEl = scope.querySelector(
+    '[data-field="taker_address_number"], [data-field="address_number"], [data-field="numero"], .address-number',
+  );
+  const neighborhoodEl = scope.querySelector(
+    '[data-field="taker_address_neighborhood"], [data-field="address_neighborhood"], [data-field="bairro"], .address-neighborhood',
+  );
+  const cityEl = scope.querySelector(
+    '[data-field="taker_address_city"], [data-field="address_city"], [data-field="cidade"], .address-city',
+  );
+  const stateEl = scope.querySelector(
+    '[data-field="taker_address_state"], [data-field="address_state"], [data-field="uf"], [data-field="estado"], .address-state',
+  );
+  const postalCodeEl = scope.querySelector(
+    '[data-field="taker_address_postal_code"], [data-field="address_postal_code"], [data-field="cep"], .address-cep',
+  );
+  const countryEl = scope.querySelector(
+    '[data-field="taker_address_country"], [data-field="address_country"], [data-field="pais"], .address-country',
+  );
+
+  if (line1El || cityEl || postalCodeEl) {
+    return {
+      line1: line1El?.textContent?.trim() || '',
+      number: numberEl?.textContent?.trim() || null,
+      neighborhood: neighborhoodEl?.textContent?.trim() || null,
+      city: cityEl?.textContent?.trim() || '',
+      state: stateEl?.textContent?.trim() || '',
+      postalCode: postalCodeEl?.textContent?.trim() || '',
+      country: countryEl?.textContent?.trim() || 'BR',
+    };
+  }
+
+  const addrContainer = scope.querySelector(
+    '[data-field="taker_address"], .taker-address, [data-field="address"], .address',
+  );
+  if (addrContainer) {
+    const raw = addrContainer.textContent?.trim() || '';
+    if (raw) {
+      const cepMatch = raw.match(/\b\d{5}-?\d{3}\b/);
+      const postalCode = cepMatch ? cepMatch[0] : '';
+      const stateMatch = raw.match(/(?:-\s*|\/\s*|\b)([A-Z]{2})\b/);
+      const state = stateMatch ? stateMatch[1] : '';
+
+      const parts = raw.split(',').map((s) => s.trim());
+      const line1 = parts[0] || raw;
+      const number = parts[1] && /^\d+[\w\s]*$/.test(parts[1]) ? parts[1] : null;
+      const part2 = parts[2];
+      const neighborhood = part2 && !part2.includes('-') ? part2 : null;
+      let city = '';
+      if (state) {
+        const cityMatch = raw.match(/,\s*([^,\-]+?)\s*-\s*[A-Z]{2}/);
+        if (cityMatch && cityMatch[1]) city = cityMatch[1].trim();
+      }
+
+      return {
+        line1,
+        number,
+        neighborhood,
+        city: city || 'Não informada',
+        state: state || 'SP',
+        postalCode: postalCode || '00000-000',
+        country: 'BR',
+      };
+    }
+  }
+
+  return undefined;
+}
+
 /**
  * Parses slideover detail HTML returned from GET /nfses/:id with Turbo-Frame: slideover_body.
  */
@@ -274,8 +367,73 @@ export function parseAdaflowSlideover(
 
   const asaasPaymentId = extractAsaasPaymentId(fullTextToSearch);
 
+  // Extract taker information if present
+  const takerScope =
+    searchScope.querySelector('[data-section="taker"], .taker-section, .service-taker') ||
+    searchScope;
+
+  const nameEl = takerScope.querySelector(
+    '[data-field="taker_name"], .taker-name, [data-field="service_taker_name"], .service-taker-name',
+  );
+  const takerName = nameEl?.textContent?.trim();
+
+  const docEl = takerScope.querySelector(
+    '[data-field="taker_document"], .taker-document, [data-field="document"]',
+  );
+  let takerDoc = docEl?.textContent?.trim();
+  if (!takerDoc) {
+    const docMatch = takerScope.textContent?.match(
+      /(?:\b\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}\b|\b\d{3}\.\d{3}\.\d{3}-\d{2}\b)/,
+    );
+    if (docMatch) {
+      takerDoc = docMatch[0];
+    }
+  }
+
+  const emailEl = takerScope.querySelector(
+    '[data-field="taker_email"], .taker-email, a[href^="mailto:"]',
+  );
+  let takerEmail =
+    emailEl?.getAttribute('href')?.replace(/^mailto:/i, '').trim() ||
+    emailEl?.textContent?.trim();
+  if (!takerEmail) {
+    const emailMatch = takerScope.textContent?.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+    if (emailMatch) {
+      takerEmail = emailMatch[0];
+    }
+  }
+
+  const phoneEl = takerScope.querySelector(
+    '[data-field="taker_phone"], .taker-phone, a[href^="tel:"]',
+  );
+  let takerPhone =
+    phoneEl?.getAttribute('href')?.replace(/^tel:/i, '').trim() ||
+    phoneEl?.textContent?.trim();
+  if (!takerPhone) {
+    const phoneMatch = takerScope.textContent?.match(
+      /(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)(?:9\d{4}[-\s]?\d{4}|\d{4}[-\s]?\d{4})/,
+    );
+    if (phoneMatch) {
+      takerPhone = phoneMatch[0].trim();
+    }
+  }
+
+  const takerAddress = extractAddressFromScope(takerScope);
+
+  let taker: AdaflowSlideoverTaker | undefined;
+  if (takerName || takerDoc || takerEmail || takerPhone || takerAddress) {
+    taker = {
+      name: takerName,
+      document: takerDoc || null,
+      email: takerEmail || null,
+      phone: takerPhone || null,
+      address: takerAddress,
+    };
+  }
+
   return {
     asaasPaymentId,
     description,
+    taker,
   };
 }

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { PaymentProvider } from '../domain/payment';
 import type { ParseResult } from './observed-payment';
+import type { AdaflowImportedTaker, AdaflowImportedTemplate } from '../services/adaflow-scraper';
 
 export interface ScanProgress {
   scanId: string;
@@ -32,11 +33,14 @@ export type ExtensionMessage =
       }>;
       pagesScanned?: number;
       totalInvoicesFound?: number;
-      takers?: Array<{
-        serviceTakerId?: string;
-        name: string;
-      }>;
+      takers?: AdaflowImportedTaker[];
+      templates?: AdaflowImportedTemplate[];
     };
+
+export type AdaflowReconciliationObservedMessage = Extract<
+  ExtensionMessage,
+  { type: 'ADAFLOW_RECONCILIATION_OBSERVED' }
+>;
 
 export const extensionMessageSchema = z.discriminatedUnion('type', [
   z.object({
@@ -122,6 +126,23 @@ export const extensionMessageSchema = z.discriminatedUnion('type', [
         z.object({
           serviceTakerId: z.string().optional(),
           name: z.string(),
+          document: z.string().nullable().optional(),
+          email: z.string().nullable().optional(),
+          phone: z.string().nullable().optional(),
+          address: z.any().optional(),
+          discoveredFromNfse: z.string().optional(),
+        }),
+      )
+      .optional(),
+    templates: z
+      .array(
+        z.object({
+          id: z.string().optional(),
+          name: z.string(),
+          description: z.string(),
+          cnae: z.string().optional(),
+          withholdTaxes: z.boolean().optional(),
+          discoveredFromNfse: z.string().optional(),
         }),
       )
       .optional(),

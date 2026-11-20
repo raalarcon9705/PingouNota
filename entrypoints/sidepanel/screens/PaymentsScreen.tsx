@@ -217,8 +217,9 @@ export const PaymentsScreen: React.FC<PaymentsScreenProps> = ({
         reason={scanReason}
         pagesSeen={pagesSeen}
         recordsFound={recordsFound}
-        sourceState={rawPayments.length === 0 && sourceState === 'unsupported-origin' ? undefined : sourceState}
+        sourceState={sourceState === 'unsupported-origin' ? undefined : sourceState}
         sourceStateMessage={sourceStateMessage}
+        hasLocalPayments={rawPayments.length > 0}
       />
 
       {/* Summary Cards */}

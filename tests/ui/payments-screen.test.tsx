@@ -414,11 +414,10 @@ describe('PaymentsScreen & UI Components', () => {
       expect(eligibility.reason).toBe('Emissão em andamento');
     });
 
-    it('disables failed emission payments with exact pt-BR reason', () => {
+    it('allows failed emission payments to be selectable', () => {
       const failed = syntheticPayments.find((p) => p.recordKey === 'pay_rec_falha_adaflow')!;
       const eligibility = getSelectionEligibility(failed);
-      expect(eligibility.selectable).toBe(false);
-      expect(eligibility.reason).toBe('Emissão anterior falhou - verificar detalhes');
+      expect(eligibility.selectable).toBe(true);
     });
 
     it('disables cancelled emission payments with exact pt-BR reason', () => {
@@ -471,7 +470,7 @@ describe('PaymentsScreen & UI Components', () => {
         name: 'Selecionar todos os pagamentos elegíveis visíveis',
       });
 
-      // There are 2 eligible rows: Alfa BRL and Beta USD
+      // There are 3 eligible rows: Alfa BRL, Beta USD, and Falha Adaflow
       expect(selectAll).not.toBeChecked();
 
       fireEvent.click(selectAll);
@@ -479,7 +478,7 @@ describe('PaymentsScreen & UI Components', () => {
 
       // Selection bar is displayed
       const selectionBar = screen.getByTestId('selection-bar');
-      expect(within(selectionBar).getByText('2 pagamentos selecionados')).toBeInTheDocument();
+      expect(within(selectionBar).getByText('3 pagamentos selecionados')).toBeInTheDocument();
 
       // Test "Marcar como emitida"
       const localMarkBtn = within(selectionBar).getByRole('button', {
@@ -491,6 +490,7 @@ describe('PaymentsScreen & UI Components', () => {
         expect.arrayContaining([
           expect.objectContaining({ recordKey: 'pay_rec_undeclared_brl' }),
           expect.objectContaining({ recordKey: 'pay_rec_undeclared_usd' }),
+          expect.objectContaining({ recordKey: 'pay_rec_falha_adaflow' }),
         ]),
       );
 
@@ -642,16 +642,12 @@ describe('PaymentsScreen & UI Components', () => {
       expect(within(emptyView).getByText('Husky')).toBeInTheDocument();
       unmount();
 
-      // Scenario B: Unsupported origin with stored payments present
+      // Scenario B: Unsupported origin with stored payments present (suppresses false alarm banner)
       render(
         <PaymentsScreen payments={syntheticPayments} sourceState="unsupported-origin" />,
       );
 
-      const banner = screen.getByTestId('view-unsupported-origin');
-      expect(within(banner).getByText('Origem não suportada')).toBeInTheDocument();
-      expect(
-        within(banner).getByText(/Abra o portal do Asaas \(asaas\.com\) ou da Husky \(husky\.io\)/i),
-      ).toBeInTheDocument();
+      expect(screen.queryByTestId('view-unsupported-origin')).not.toBeInTheDocument();
       // Stored payments are still listed
       expect(screen.getByText('Cliente Alfa BRL')).toBeInTheDocument();
     });

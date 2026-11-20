@@ -1,10 +1,12 @@
 import { browser } from 'wxt/browser';
 import { db, type PingouNotaDB } from '../storage/database';
 import type { TakerProfile } from '../domain/taker';
+import type { ServiceTemplate } from '../domain/template';
 import {
   fetchAdaflowDeclarations,
   type AdaflowReconciledDeclaration,
   type AdaflowImportedTaker,
+  type AdaflowImportedTemplate,
   type FetchAdaflowDeclarationsOptions,
   type FetchAdaflowDeclarationsResult,
 } from './adaflow-scraper';
@@ -13,11 +15,36 @@ export {
   fetchAdaflowDeclarations,
   type AdaflowReconciledDeclaration,
   type AdaflowImportedTaker,
+  type AdaflowImportedTemplate,
   type FetchAdaflowDeclarationsOptions,
   type FetchAdaflowDeclarationsResult,
 };
 
 export const RECONCILIATION_AUDIT_STORAGE_KEY = 'last_reconciliation_audit';
+export const PROPOSED_TAKERS_STORAGE_KEY = 'adaflow_proposed_takers';
+export const PROPOSED_TEMPLATES_STORAGE_KEY = 'adaflow_proposed_templates';
+
+export interface ProposedTaker {
+  id: string;
+  serviceTakerId?: string;
+  name: string;
+  document?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  address?: TakerProfile['address'];
+  discoveredFromNfse?: string;
+  suggestedAt: string;
+}
+
+export interface ProposedTemplate {
+  id: string;
+  name: string;
+  description: string;
+  cnae?: string;
+  withholdTaxes?: boolean;
+  discoveredFromNfse?: string;
+  suggestedAt: string;
+}
 
 export interface ReconciliationAuditRecord {
   timestamp: string;
@@ -45,6 +72,8 @@ export interface ReconcileAdaflowResult {
 }
 
 let memoryAuditForTesting: ReconciliationAuditRecord | null = null;
+let memoryProposedTakersForTesting: ProposedTaker[] = [];
+let memoryProposedTemplatesForTesting: ProposedTemplate[] = [];
 
 /**
  * Recupera o último registro de auditoria de conciliação do storage.
@@ -113,6 +142,169 @@ export function _resetMemoryAuditForTesting(): void {
   memoryAuditForTesting = null;
 }
 
+export function _resetProposedForTesting(): void {
+  memoryProposedTakersForTesting = [];
+  memoryProposedTemplatesForTesting = [];
+}
+
+/**
+ * Recupera os tomadores sugeridos (propostas aguardando aprovação) do storage.
+ */
+export async function getProposedTakers(): Promise<ProposedTaker[]> {
+  try {
+    if (typeof browser !== 'undefined' && browser?.storage?.local?.get) {
+      const res = await browser.storage.local.get(PROPOSED_TAKERS_STORAGE_KEY);
+      if (res?.[PROPOSED_TAKERS_STORAGE_KEY]) {
+        return res[PROPOSED_TAKERS_STORAGE_KEY] as ProposedTaker[];
+      }
+      return [];
+    }
+    if (typeof chrome !== 'undefined' && chrome?.storage?.local?.get) {
+      return new Promise<ProposedTaker[]>((resolve) => {
+        chrome.storage.local.get([PROPOSED_TAKERS_STORAGE_KEY], (res: Record<string, unknown>) => {
+          resolve((res?.[PROPOSED_TAKERS_STORAGE_KEY] as ProposedTaker[]) || []);
+        });
+      });
+    }
+  } catch (err) {
+    console.warn('[PingouNota:Reconciliação] Falha ao recuperar tomadores propostos:', err);
+  }
+  return [...memoryProposedTakersForTesting];
+}
+
+/**
+ * Salva a lista de tomadores sugeridos no storage.
+ */
+export async function saveProposedTakers(proposals: ProposedTaker[]): Promise<void> {
+  memoryProposedTakersForTesting = [...proposals];
+  try {
+    if (typeof browser !== 'undefined' && browser?.storage?.local?.set) {
+      await browser.storage.local.set({ [PROPOSED_TAKERS_STORAGE_KEY]: proposals });
+      return;
+    }
+    if (typeof chrome !== 'undefined' && chrome?.storage?.local?.set) {
+      await new Promise<void>((resolve, reject) => {
+        chrome.storage.local.set({ [PROPOSED_TAKERS_STORAGE_KEY]: proposals }, () => {
+          if (chrome.runtime?.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else {
+            resolve();
+          }
+        });
+      });
+      return;
+    }
+  } catch (err) {
+    console.warn('[PingouNota:Reconciliação] Falha ao salvar tomadores propostos:', err);
+  }
+}
+
+/**
+ * Aprova um tomador sugerido, persistindo-o no Dexie e removendo a sugestão.
+ */
+export async function approveProposedTaker(
+  id: string,
+  taker: TakerProfile,
+  dbInstance: PingouNotaDB = db,
+): Promise<void> {
+  await dbInstance.takers.put({
+    ...taker,
+    createdAt: taker.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+  const current = await getProposedTakers();
+  const filtered = current.filter((p) => p.id !== id);
+  await saveProposedTakers(filtered);
+}
+
+/**
+ * Descarta um tomador sugerido sem salvá-lo no Dexie.
+ */
+export async function dismissProposedTaker(id: string): Promise<void> {
+  const current = await getProposedTakers();
+  const filtered = current.filter((p) => p.id !== id);
+  await saveProposedTakers(filtered);
+}
+
+/**
+ * Recupera os modelos sugeridos (propostas aguardando aprovação) do storage.
+ */
+export async function getProposedTemplates(): Promise<ProposedTemplate[]> {
+  try {
+    if (typeof browser !== 'undefined' && browser?.storage?.local?.get) {
+      const res = await browser.storage.local.get(PROPOSED_TEMPLATES_STORAGE_KEY);
+      if (res?.[PROPOSED_TEMPLATES_STORAGE_KEY]) {
+        return res[PROPOSED_TEMPLATES_STORAGE_KEY] as ProposedTemplate[];
+      }
+      return [];
+    }
+    if (typeof chrome !== 'undefined' && chrome?.storage?.local?.get) {
+      return new Promise<ProposedTemplate[]>((resolve) => {
+        chrome.storage.local.get([PROPOSED_TEMPLATES_STORAGE_KEY], (res: Record<string, unknown>) => {
+          resolve((res?.[PROPOSED_TEMPLATES_STORAGE_KEY] as ProposedTemplate[]) || []);
+        });
+      });
+    }
+  } catch (err) {
+    console.warn('[PingouNota:Reconciliação] Falha ao recuperar modelos propostos:', err);
+  }
+  return [...memoryProposedTemplatesForTesting];
+}
+
+/**
+ * Salva a lista de modelos sugeridos no storage.
+ */
+export async function saveProposedTemplates(proposals: ProposedTemplate[]): Promise<void> {
+  memoryProposedTemplatesForTesting = [...proposals];
+  try {
+    if (typeof browser !== 'undefined' && browser?.storage?.local?.set) {
+      await browser.storage.local.set({ [PROPOSED_TEMPLATES_STORAGE_KEY]: proposals });
+      return;
+    }
+    if (typeof chrome !== 'undefined' && chrome?.storage?.local?.set) {
+      await new Promise<void>((resolve, reject) => {
+        chrome.storage.local.set({ [PROPOSED_TEMPLATES_STORAGE_KEY]: proposals }, () => {
+          if (chrome.runtime?.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else {
+            resolve();
+          }
+        });
+      });
+      return;
+    }
+  } catch (err) {
+    console.warn('[PingouNota:Reconciliação] Falha ao salvar modelos propostos:', err);
+  }
+}
+
+/**
+ * Aprova um modelo sugerido, persistindo-o no Dexie e removendo a sugestão.
+ */
+export async function approveProposedTemplate(
+  id: string,
+  template: ServiceTemplate,
+  dbInstance: PingouNotaDB = db,
+): Promise<void> {
+  await dbInstance.templates.put({
+    ...template,
+    createdAt: template.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+  const current = await getProposedTemplates();
+  const filtered = current.filter((p) => p.id !== id);
+  await saveProposedTemplates(filtered);
+}
+
+/**
+ * Descarta um modelo sugerido sem salvá-lo no Dexie.
+ */
+export async function dismissProposedTemplate(id: string): Promise<void> {
+  const current = await getProposedTemplates();
+  const filtered = current.filter((p) => p.id !== id);
+  await saveProposedTemplates(filtered);
+}
+
 /**
  * Normalizes date string (DD/MM/YYYY or ISO) into an ISO string.
  */
@@ -142,7 +334,14 @@ export function normalizeDateIso(dateStr?: string | null): string {
  * Upserts service takers extracted from Adaflow into db.takers.
  */
 export async function importAdaflowTakers(
-  takers: Array<{ serviceTakerId?: string; name: string }>,
+  takers: Array<{
+    serviceTakerId?: string;
+    name: string;
+    document?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    address?: TakerProfile['address'];
+  }>,
   dbInstance: PingouNotaDB = db,
 ): Promise<number> {
   if (!takers || takers.length === 0) return 0;
@@ -159,7 +358,16 @@ export async function importAdaflowTakers(
           .replace(/^_+|_+$/g, '') || String(Date.now());
       const id = t.serviceTakerId || `taker_${slug}`;
 
-      const existing = await dbInstance.takers.get(id);
+      let existing = await dbInstance.takers.get(id);
+      if (!existing && t.serviceTakerId) {
+        existing = await dbInstance.takers
+          .filter((taker) => taker.externalId === t.serviceTakerId)
+          .first();
+      }
+      if (!existing) {
+        existing = await dbInstance.takers.where('name').equalsIgnoreCase(name).first();
+      }
+
       if (existing) {
         let changed = false;
         if (!existing.name && name) {
@@ -168,6 +376,18 @@ export async function importAdaflowTakers(
         }
         if (!existing.externalId && t.serviceTakerId) {
           existing.externalId = t.serviceTakerId;
+          changed = true;
+        }
+        if (!existing.document && t.document) {
+          existing.document = t.document;
+          changed = true;
+        }
+        if (!existing.email && t.email) {
+          existing.email = t.email;
+          changed = true;
+        }
+        if (!existing.phone && t.phone) {
+          existing.phone = t.phone;
           changed = true;
         }
         if (changed) {
@@ -179,10 +399,11 @@ export async function importAdaflowTakers(
         const newTaker: TakerProfile = {
           id,
           name,
-          document: null,
+          document: t.document || null,
           externalId: t.serviceTakerId || null,
-          email: null,
-          address: {
+          email: t.email || null,
+          phone: t.phone || null,
+          address: t.address || {
             line1: 'Importado Adaflow',
             number: null,
             neighborhood: null,
@@ -212,10 +433,129 @@ export async function importAdaflowTakers(
 export async function reconcileAdaflowDeclarations(
   declarations: AdaflowReconciledDeclaration[],
   dbInstance: PingouNotaDB = db,
-  takers?: Array<{ serviceTakerId?: string; name: string }>,
+  takers?: AdaflowImportedTaker[],
+  templates?: AdaflowImportedTemplate[],
 ): Promise<ReconcileAdaflowResult> {
+  // Propose takers rather than silent auto-insertion
   if (takers && takers.length > 0) {
-    await importAdaflowTakers(takers, dbInstance);
+    const existingTakers = await dbInstance.takers.toArray();
+    const currentProposals = await getProposedTakers();
+    const newProposals: ProposedTaker[] = [];
+
+    for (const t of takers) {
+      if (!t.name || !t.name.trim()) continue;
+      const trimmedName = t.name.trim().toLowerCase();
+      const extId = t.serviceTakerId?.trim();
+
+      const inDb = existingTakers.some((dbTaker) => {
+        if (extId && dbTaker.externalId === extId) return true;
+        return dbTaker.name.trim().toLowerCase() === trimmedName;
+      });
+      if (inDb) continue;
+
+      const inProposals =
+        currentProposals.some((p) => {
+          if (extId && p.serviceTakerId === extId) return true;
+          return p.name.trim().toLowerCase() === trimmedName;
+        }) ||
+        newProposals.some((p) => {
+          if (extId && p.serviceTakerId === extId) return true;
+          return p.name.trim().toLowerCase() === trimmedName;
+        });
+      if (inProposals) continue;
+
+      const slug =
+        trimmedName
+          .replace(/[^a-z0-9]+/g, '_')
+          .replace(/^_+|_+$/g, '') || String(Date.now());
+      const proposalId = extId || `prop_taker_${slug}`;
+
+      newProposals.push({
+        id: proposalId,
+        serviceTakerId: extId || undefined,
+        name: t.name.trim(),
+        document: t.document || null,
+        email: t.email || null,
+        phone: t.phone || null,
+        address: t.address || {
+          line1: 'Importado Adaflow',
+          number: null,
+          neighborhood: null,
+          city: 'São Paulo',
+          state: 'SP',
+          postalCode: '01000-000',
+          country: 'Brasil',
+        },
+        discoveredFromNfse: t.discoveredFromNfse,
+        suggestedAt: new Date().toISOString(),
+      });
+    }
+
+    if (newProposals.length > 0) {
+      await saveProposedTakers([...currentProposals, ...newProposals]);
+      console.info(
+        `[PingouNota:Tomadores] 💡 ${newProposals.length} novos tomadores sugeridos para aprovação do usuário.`,
+      );
+    }
+  }
+
+  // Propose templates rather than silent auto-insertion
+  if (templates && templates.length > 0) {
+    const existingTemplates = await dbInstance.templates.toArray();
+    const currentProposals = await getProposedTemplates();
+    const newProposals: ProposedTemplate[] = [];
+
+    for (const tmpl of templates) {
+      if (!tmpl.description || !tmpl.description.trim()) continue;
+      const trimmedDesc = tmpl.description.trim().toLowerCase();
+      const trimmedName = tmpl.name.trim().toLowerCase();
+
+      const inDb = existingTemplates.some((dbTmpl) => {
+        return (
+          dbTmpl.description.trim().toLowerCase() === trimmedDesc ||
+          dbTmpl.name.trim().toLowerCase() === trimmedName
+        );
+      });
+      if (inDb) continue;
+
+      const inProposals =
+        currentProposals.some((p) => {
+          return (
+            p.description.trim().toLowerCase() === trimmedDesc ||
+            p.name.trim().toLowerCase() === trimmedName
+          );
+        }) ||
+        newProposals.some((p) => {
+          return (
+            p.description.trim().toLowerCase() === trimmedDesc ||
+            p.name.trim().toLowerCase() === trimmedName
+          );
+        });
+      if (inProposals) continue;
+
+      const slug =
+        trimmedName
+          .replace(/[^a-z0-9]+/g, '_')
+          .replace(/^_+|_+$/g, '') || String(Date.now());
+      const proposalId = tmpl.id || `prop_tmpl_${slug}_${Math.random().toString(36).slice(2, 6)}`;
+
+      newProposals.push({
+        id: proposalId,
+        name: tmpl.name.trim(),
+        description: tmpl.description.trim(),
+        cnae: tmpl.cnae || '6201-5/01',
+        withholdTaxes: tmpl.withholdTaxes ?? false,
+        discoveredFromNfse: tmpl.discoveredFromNfse,
+        suggestedAt: new Date().toISOString(),
+      });
+    }
+
+    if (newProposals.length > 0) {
+      await saveProposedTemplates([...currentProposals, ...newProposals]);
+      console.info(
+        `[PingouNota:Modelos] 💡 ${newProposals.length} novos modelos sugeridos para aprovação do usuário.`,
+      );
+    }
   }
 
   console.info(

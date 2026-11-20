@@ -11,6 +11,10 @@ import TakersScreen from './screens/TakersScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import LocalMarkDialog from './components/LocalMarkDialog';
 import { browser } from 'wxt/browser';
+import {
+  getProposedTakers,
+  getProposedTemplates,
+} from '../../src/services/adaflow-reconciliation';
 
 export type TabKey = 'pagamentos' | 'operacoes' | 'modelos' | 'tomadores' | 'configuracoes';
 
@@ -42,6 +46,21 @@ export const App: React.FC = () => {
   const [scanReason, setScanReason] = useState<string | null>(null);
   const [scanPages, setScanPages] = useState<number>(0);
   const [scanRecords, setScanRecords] = useState<number>(0);
+  const [proposedTakersCount, setProposedTakersCount] = useState<number>(0);
+  const [proposedTemplatesCount, setProposedTemplatesCount] = useState<number>(0);
+
+  const refreshProposalCounts = useCallback(async () => {
+    try {
+      const [takers, templates] = await Promise.all([
+        getProposedTakers(),
+        getProposedTemplates(),
+      ]);
+      setProposedTakersCount(takers.length);
+      setProposedTemplatesCount(templates.length);
+    } catch (e) {
+      console.warn('[PingouNota] Erro ao carregar contagem de propostas:', e);
+    }
+  }, []);
 
   // Local Mark confirmation dialog state
   const [selectedForLocalMark, setSelectedForLocalMark] = useState<
@@ -112,8 +131,13 @@ export const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    refreshProposalCounts();
+  }, [activeTab, refreshProposalCounts]);
+
+  useEffect(() => {
     loadData();
     checkActiveTab();
+    refreshProposalCounts();
 
     const onActivated = () => {
       checkActiveTab();
@@ -125,6 +149,12 @@ export const App: React.FC = () => {
       }
     };
 
+    const onStorageChanged = (changes: Record<string, unknown>) => {
+      if (changes['adaflow_proposed_takers'] || changes['adaflow_proposed_templates']) {
+        refreshProposalCounts();
+      }
+    };
+
     // Listen for extension messages to live-update the side panel
     const handleMessage = (message: unknown) => {
       if (!message || typeof message !== 'object') return;
@@ -132,6 +162,10 @@ export const App: React.FC = () => {
 
       if (msg.type === 'PAYMENTS_OBSERVED' || msg.type === 'ISSUE_QUEUE_PROGRESS') {
         loadData();
+      }
+
+      if (msg.type === 'ADAFLOW_RECONCILIATION_OBSERVED') {
+        refreshProposalCounts();
       }
 
       if (msg.type === 'SCAN_PROGRESS' && msg.progress) {
@@ -156,6 +190,7 @@ export const App: React.FC = () => {
       browser?.tabs?.onActivated?.addListener?.(onActivated);
       browser?.tabs?.onUpdated?.addListener?.(onUpdated);
       browser?.runtime?.onMessage?.addListener?.(handleMessage);
+      browser?.storage?.onChanged?.addListener?.(onStorageChanged);
     } catch {
       // Ignore in non-extension environments (e.g. tests)
     }
@@ -165,11 +200,12 @@ export const App: React.FC = () => {
         browser?.tabs?.onActivated?.removeListener?.(onActivated);
         browser?.tabs?.onUpdated?.removeListener?.(onUpdated);
         browser?.runtime?.onMessage?.removeListener?.(handleMessage);
+        browser?.storage?.onChanged?.removeListener?.(onStorageChanged);
       } catch {
         // Ignore errors during cleanup
       }
     };
-  }, [loadData, checkActiveTab]);
+  }, [loadData, checkActiveTab, refreshProposalCounts]);
 
   const handleLocalMark = (selected: Payment[]) => {
     setSelectedForLocalMark(selected);
@@ -231,7 +267,7 @@ export const App: React.FC = () => {
             setActiveTab('modelos');
           }}
         >
-          Modelos
+          Modelos {proposedTemplatesCount > 0 && <span className="tab-badge" data-testid="badge-templates">{proposedTemplatesCount}</span>}
         </button>
         <button
           type="button"
@@ -245,7 +281,7 @@ export const App: React.FC = () => {
             setActiveTab('tomadores');
           }}
         >
-          Tomadores
+          Tomadores {proposedTakersCount > 0 && <span className="tab-badge" data-testid="badge-takers">{proposedTakersCount}</span>}
         </button>
         <button
           type="button"

@@ -58,6 +58,7 @@ export const TakerForm: React.FC<TakerFormProps> = ({
     document: initialTaker?.document || '',
     externalId: initialTaker?.externalId || '',
     email: initialTaker?.email || '',
+    phone: initialTaker?.phone || '',
     line1: initialTaker?.address?.line1 || '',
     number: initialTaker?.address?.number || '',
     neighborhood: initialTaker?.address?.neighborhood || '',
@@ -114,6 +115,7 @@ export const TakerForm: React.FC<TakerFormProps> = ({
       document: formData.document.trim() ? formData.document.trim() : null,
       externalId: formData.externalId.trim() ? formData.externalId.trim() : null,
       email: formData.email.trim() ? formData.email.trim() : null,
+      phone: formData.phone.trim() ? formData.phone.trim() : null,
       address: {
         line1: formData.line1.trim(),
         number: formData.number.trim() ? formData.number.trim() : null,
@@ -257,27 +259,52 @@ export const TakerForm: React.FC<TakerFormProps> = ({
           </div>
         </div>
 
-        <div className="form-group">
-          <label htmlFor="taker-email" className="form-label">
-            E-mail
-          </label>
-          <input
-            id="taker-email"
-            name="email"
-            type="email"
-            className={`form-input ${errors.email ? 'input-error' : ''}`}
-            placeholder="Ex: financeiro@tomador.com.br"
-            value={formData.email}
-            onChange={handleInputChange}
-            disabled={isLoading || isSubmitting}
-            aria-invalid={Boolean(errors.email)}
-            aria-describedby={errors.email ? 'taker-email-error' : undefined}
-          />
-          {errors.email && (
-            <span id="taker-email-error" className="form-error-message">
-              {errors.email}
-            </span>
-          )}
+        <div className="form-row">
+          <div className="form-group flex-1">
+            <label htmlFor="taker-email" className="form-label">
+              E-mail
+            </label>
+            <input
+              id="taker-email"
+              name="email"
+              type="email"
+              className={`form-input ${errors.email ? 'input-error' : ''}`}
+              placeholder="Ex: financeiro@tomador.com.br"
+              value={formData.email}
+              onChange={handleInputChange}
+              disabled={isLoading || isSubmitting}
+              aria-invalid={Boolean(errors.email)}
+              aria-describedby={errors.email ? 'taker-email-error' : undefined}
+            />
+            {errors.email && (
+              <span id="taker-email-error" className="form-error-message">
+                {errors.email}
+              </span>
+            )}
+          </div>
+
+          <div className="form-group flex-1">
+            <label htmlFor="taker-phone" className="form-label">
+              Telefone
+            </label>
+            <input
+              id="taker-phone"
+              name="phone"
+              type="tel"
+              className={`form-input ${errors.phone ? 'input-error' : ''}`}
+              placeholder="Ex: (11) 98765-4321"
+              value={formData.phone}
+              onChange={handleInputChange}
+              disabled={isLoading || isSubmitting}
+              aria-invalid={Boolean(errors.phone)}
+              aria-describedby={errors.phone ? 'taker-phone-error' : undefined}
+            />
+            {errors.phone && (
+              <span id="taker-phone-error" className="form-error-message">
+                {errors.phone}
+              </span>
+            )}
+          </div>
         </div>
       </fieldset>
 

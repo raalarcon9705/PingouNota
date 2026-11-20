@@ -167,7 +167,12 @@ export default defineBackground(() => {
           `[PingouNota:Reconciliação] 📄 ${pagesScanned} páginas escaneadas na Adaflow (${validMessage.declarations.length} notas com referência Asaas)`,
         );
 
-        reconcileAdaflowDeclarations(validMessage.declarations, undefined, validMessage.takers)
+        reconcileAdaflowDeclarations(
+          validMessage.declarations,
+          undefined,
+          validMessage.takers,
+          validMessage.templates,
+        )
           .then(async ({ matchedCount, updatedCount }) => {
             await updateActionBadge();
             sendResponse({ success: true, matchedCount, updatedCount });

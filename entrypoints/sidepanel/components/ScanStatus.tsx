@@ -10,6 +10,7 @@ export interface ScanStatusProps {
   recordsFound?: number;
   sourceState?: PortalSourceState;
   sourceStateMessage?: string | null;
+  hasLocalPayments?: boolean;
 }
 
 export const ScanStatus: React.FC<ScanStatusProps> = ({
@@ -19,6 +20,7 @@ export const ScanStatus: React.FC<ScanStatusProps> = ({
   recordsFound = 0,
   sourceState = 'supported',
   sourceStateMessage,
+  hasLocalPayments = false,
 }) => {
   if (sourceState === 'source-unavailable') {
     return (
@@ -39,7 +41,7 @@ export const ScanStatus: React.FC<ScanStatusProps> = ({
     );
   }
 
-  if (sourceState === 'unsupported-origin') {
+  if (sourceState === 'unsupported-origin' && !hasLocalPayments) {
     return (
       <div
         className="banner banner-warning banner-unsupported-origin"
