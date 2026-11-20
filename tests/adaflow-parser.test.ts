@@ -24,6 +24,7 @@ describe('Adaflow Parser', () => {
       expect(first?.nfseNumber).toBe('Nº 80');
       expect(first?.date).toBe('30/10/2026');
       expect(first?.takerName).toBe('Avanto LLC');
+      expect(first?.serviceTakerId).toBe('21116');
       expect(first?.amountCents).toBe(1660681);
       expect(first?.status).toBe('Emitido');
       expect(first?.pdfUrl).toContain('/nf-80.pdf');
@@ -36,6 +37,7 @@ describe('Adaflow Parser', () => {
       expect(third?.nfseNumber).toBe('Nº 78');
       expect(third?.date).toBe('17/10/2026');
       expect(third?.takerName).toBe('SERGIVANDO ALAIR MARTINS');
+      expect(third?.serviceTakerId).toBe('20739');
       expect(third?.amountCents).toBe(790); // R$ 7,90
       expect(third?.status).toBe('Emitido');
       expect(third?.pdfUrl).toContain('/nf-78.pdf');
@@ -121,6 +123,45 @@ describe('Adaflow Parser', () => {
       expect(
         extractAsaasPaymentId('Honorários Asaas 9876543210'),
       ).toBe('9876543210');
+    });
+
+    it('normalizes formatted payment numbers with dots, spaces, hyphens, and slashes', () => {
+      // Standalone formatted numbers
+      expect(extractAsaasPaymentId('89.155.748')).toBe('89155748');
+      expect(extractAsaasPaymentId('89 155 748')).toBe('89155748');
+      expect(extractAsaasPaymentId('89-155748')).toBe('89155748');
+
+      // Formatted numbers within descriptions
+      expect(
+        extractAsaasPaymentId('referente a cobrança Asaas nº 89.155.748'),
+      ).toBe('89155748');
+
+      expect(
+        extractAsaasPaymentId('referente à cobrança Asaas nº 932162415'),
+      ).toBe('932162415');
+
+      expect(
+        extractAsaasPaymentId('Serviços prestados referente a cobrança Asaas 89 155 748'),
+      ).toBe('89155748');
+
+      expect(
+        extractAsaasPaymentId('Cobrança Asaas #89-155748 parcela 1'),
+      ).toBe('89155748');
+
+      expect(
+        extractAsaasPaymentId('Asaas 891557/1'),
+      ).toBe('8915571');
+    });
+
+    it('falls back to 8-12 digit sequence if cleaned ID is less than 7 digits', () => {
+      expect(
+        extractAsaasPaymentId('Asaas nº 123 - contrato 2026112001'),
+      ).toBe('2026112001');
+
+      // Preserves raw digits if still < 7 and no fallback exists
+      expect(
+        extractAsaasPaymentId('Asaas nº 12345'),
+      ).toBe('12345');
     });
 
     it('returns null when no Asaas pattern is found', () => {

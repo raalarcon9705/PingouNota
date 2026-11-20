@@ -162,7 +162,12 @@ export default defineBackground(() => {
       }
 
       if (validMessage.type === 'ADAFLOW_RECONCILIATION_OBSERVED') {
-        reconcileAdaflowDeclarations(validMessage.declarations)
+        const pagesScanned = validMessage.pagesScanned ?? 1;
+        console.info(
+          `[PingouNota:Reconciliação] 📄 ${pagesScanned} páginas escaneadas na Adaflow (${validMessage.declarations.length} notas com referência Asaas)`,
+        );
+
+        reconcileAdaflowDeclarations(validMessage.declarations, undefined, validMessage.takers)
           .then(async ({ matchedCount, updatedCount }) => {
             await updateActionBadge();
             sendResponse({ success: true, matchedCount, updatedCount });

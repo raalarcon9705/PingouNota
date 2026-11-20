@@ -5,6 +5,7 @@ export interface AdaflowParsedInvoice {
   nfseNumber: string;
   date: string;
   takerName: string;
+  serviceTakerId?: string;
   amountCents: number;
   status: string;
   pdfUrl?: string;
@@ -38,25 +39,50 @@ function resolveDocument(htmlOrDoc: string | Document | Element): Document | Ele
 }
 
 /**
- * Extracts Asaas Payment ID using strict priority regexes:
- * 1. referente à cobran[çc]a Asaas nº\s*(\d+) (case-insensitive)
- * 2. Asaas nº\s*(\d+)
- * 3. cobran[çc]a Asaas\s*(\d+)
- * 4. Asaas\s*#?\s*(\d{7,12})
+ * Extracts Asaas Payment ID using robust candidate punctuation matching and normalization:
+ * Captures tokens like 89.155.748, 89 155 748, 89-155748, 891557/1, etc.
+ * Normalizes all punctuation to digits and verifies length.
  */
 export function extractAsaasPaymentId(text: string | null | undefined): string | null {
   if (!text) return null;
 
   const patterns = [
-    /referente [aà] cobran[çc]a Asaas\s*(?:n[º°o\.]|num\.?)?\s*(\d+)/i,
-    /cobran[çc]a Asaas\s*(?:n[º°o\.]|num\.?)?\s*(\d+)/i,
-    /Asaas\s*(?:n[º°o\.]|num\.?|#)?\s*(\d+)/i,
+    /referente [aà] cobran[çc]a Asaas\s*(?:n[º°o\.]|num\.?|#)?\s*([0-9][0-9\.\s\-_/]*[0-9]|\d+)/i,
+    /cobran[çc]a Asaas\s*(?:n[º°o\.]|num\.?|#)?\s*([0-9][0-9\.\s\-_/]*[0-9]|\d+)/i,
+    /Asaas\s*(?:n[º°o\.]|num\.?|#)?\s*([0-9][0-9\.\s\-_/]*[0-9]|\d+)/i,
   ];
 
   for (const regex of patterns) {
     const match = text.match(regex);
     if (match && match[1]) {
-      return match[1];
+      const rawMatch = match[1];
+      const cleaned = rawMatch.replace(/\D/g, '');
+      if (cleaned.length >= 7) {
+        return cleaned;
+      }
+      const fallbackMatch = text.match(/(?:^|\D)(\d{8,12})(?:\D|$)/);
+      if (fallbackMatch && fallbackMatch[1]) {
+        return fallbackMatch[1];
+      }
+      if (cleaned.length > 0) {
+        return cleaned;
+      }
+    }
+  }
+
+  // Handle case where text itself is purely a formatted numeric token (e.g. "89.155.748")
+  const trimmed = text.trim();
+  if (/^[0-9][0-9\.\s\-_/]*[0-9]$|^\d+$/.test(trimmed)) {
+    const cleaned = trimmed.replace(/\D/g, '');
+    if (cleaned.length >= 7) {
+      return cleaned;
+    }
+    const fallbackMatch = text.match(/(?:^|\D)(\d{8,12})(?:\D|$)/);
+    if (fallbackMatch && fallbackMatch[1]) {
+      return fallbackMatch[1];
+    }
+    if (cleaned.length > 0) {
+      return cleaned;
     }
   }
 
@@ -78,6 +104,11 @@ export function parseAdaflowInvoiceCard(cardEl: Element): AdaflowParsedInvoice |
   if (isNaN(adaflowNfseId)) {
     return null;
   }
+
+  // Extract duplicate link to obtain service_taker_id query param
+  const duplicateLink = cardEl.querySelector('a[href*="service_taker_id="]')?.getAttribute('href');
+  const serviceTakerIdMatch = duplicateLink?.match(/service_taker_id=(\d+)/);
+  const serviceTakerId = serviceTakerIdMatch ? serviceTakerIdMatch[1] : undefined;
 
   const pElements = Array.from(cardEl.querySelectorAll('p'));
   const pTexts = pElements.map((p) => p.textContent?.trim() || '');
@@ -124,6 +155,7 @@ export function parseAdaflowInvoiceCard(cardEl: Element): AdaflowParsedInvoice |
     nfseNumber: nfseNumberMatch,
     date: dateMatch,
     takerName,
+    serviceTakerId,
     amountCents,
     status,
     pdfUrl,

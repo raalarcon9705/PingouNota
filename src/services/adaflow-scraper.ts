@@ -13,34 +13,67 @@ export interface AdaflowReconciledDeclaration {
   description?: string;
 }
 
+export interface AdaflowImportedTaker {
+  serviceTakerId?: string;
+  name: string;
+}
+
 export interface FetchAdaflowDeclarationsOptions {
   startUrl?: string;
   maxPages?: number;
   fetchFn?: typeof fetch;
 }
 
+export type FetchAdaflowDeclarationsResult = AdaflowReconciledDeclaration[] & {
+  declarations: AdaflowReconciledDeclaration[];
+  pagesScanned: number;
+  totalInvoicesFound: number;
+  takers: AdaflowImportedTaker[];
+};
+
 /**
- * Traverses Adaflow NFSe pages, fetches slideover details for each invoice,
- * and extracts reconciled declarations with Asaas payment IDs.
+ * Traverses Adaflow NFSe pages using a guaranteed queue across all pages,
+ * fetches slideover details for each invoice, extracts reconciled declarations
+ * with Asaas payment IDs, and collects unique takers for reuse.
  * Independent of Dexie/database so it can be safely bundled into content scripts.
  */
 export async function fetchAdaflowDeclarations(
   options: FetchAdaflowDeclarationsOptions = {},
-): Promise<AdaflowReconciledDeclaration[]> {
+): Promise<FetchAdaflowDeclarationsResult> {
   const startUrl = options.startUrl ?? '/nfses';
-  const maxPages = options.maxPages ?? 10;
+  const maxPages = options.maxPages ?? 50;
   const fetchFn = options.fetchFn ?? globalThis.fetch;
 
   console.info('[PingouNota:Adaflow] 🔍 Iniciando auditoria de notas fiscais emitidas...');
 
-  let currentUrl: string | null = startUrl;
-  let pagesFetched = 0;
+  const isHttp = startUrl.startsWith('http');
+  const normalizeUrl = (href: string): string => {
+    const url = new URL(href, 'https://app.adaflow.com');
+    return isHttp
+      ? new URL(url.pathname + url.search, startUrl).toString()
+      : url.pathname + url.search;
+  };
+
+  const initialUrl = isHttp ? startUrl : normalizeUrl(startUrl);
+  const pageQueue: string[] = [initialUrl];
   const visited = new Set<string>();
   const reconciledDeclarations: AdaflowReconciledDeclaration[] = [];
+  const uniqueTakersMap = new Map<string, AdaflowImportedTaker>();
+  const allScannedNotes: Array<{
+    adaflowNfseId: number;
+    nfseNumber?: string;
+    takerName?: string;
+    asaasPaymentId?: string | null;
+    description?: string;
+    requiresManualAction: boolean;
+  }> = [];
 
-  while (currentUrl && pagesFetched < maxPages) {
+  let pagesFetched = 0;
+
+  while (pageQueue.length > 0 && pagesFetched < maxPages) {
+    const currentUrl = pageQueue.shift()!;
     if (visited.has(currentUrl)) {
-      break;
+      continue;
     }
     visited.add(currentUrl);
     pagesFetched++;
@@ -54,12 +87,12 @@ export async function fetchAdaflowDeclarations(
         console.warn(
           `[PingouNota] Failed to fetch Adaflow page: ${currentUrl} (HTTP ${response.status})`,
         );
-        break;
+        continue;
       }
       html = await response.text();
     } catch (err) {
       console.warn(`[PingouNota] Error fetching Adaflow page: ${currentUrl}`, err);
-      break;
+      continue;
     }
 
     const { invoices, pagination } = parseAdaflowInvoicesPage(html);
@@ -70,7 +103,34 @@ export async function fetchAdaflowDeclarations(
       `[PingouNota:Adaflow] 📄 Página ${currentPage}: ${invoices.length} notas encontradas. Próxima: ${nextHref || 'fim'}`,
     );
 
+    // Queue discovered next and page links
+    const discoveredHrefs: string[] = [];
+    if (pagination.nextHref) {
+      discoveredHrefs.push(pagination.nextHref);
+    }
+    if (pagination.pageHrefs) {
+      discoveredHrefs.push(...pagination.pageHrefs);
+    }
+
+    for (const href of discoveredHrefs) {
+      const norm = normalizeUrl(href);
+      if (!visited.has(norm) && !pageQueue.includes(norm)) {
+        pageQueue.push(norm);
+      }
+    }
+
     for (const invoice of invoices) {
+      if (invoice.takerName && invoice.takerName.trim()) {
+        const name = invoice.takerName.trim();
+        const key = invoice.serviceTakerId || name.toLowerCase();
+        if (!uniqueTakersMap.has(key)) {
+          uniqueTakersMap.set(key, {
+            serviceTakerId: invoice.serviceTakerId,
+            name,
+          });
+        }
+      }
+
       try {
         const detailPath = `/nfses/${invoice.adaflowNfseId}`;
         const detailUrl = currentUrl.startsWith('http')
@@ -86,11 +146,29 @@ export async function fetchAdaflowDeclarations(
           console.warn(
             `[PingouNota] Failed to fetch slideover for nfse ${invoice.adaflowNfseId} (HTTP ${detailResponse.status})`,
           );
+          allScannedNotes.push({
+            adaflowNfseId: invoice.adaflowNfseId,
+            nfseNumber: invoice.nfseNumber || undefined,
+            takerName: invoice.takerName || undefined,
+            asaasPaymentId: null,
+            description: undefined,
+            requiresManualAction: true,
+          });
           continue;
         }
 
         const detailHtml = await detailResponse.text();
         const slideoverDetail = parseAdaflowSlideover(detailHtml);
+
+        const hasAsaasId = Boolean(slideoverDetail.asaasPaymentId);
+        allScannedNotes.push({
+          adaflowNfseId: invoice.adaflowNfseId,
+          nfseNumber: invoice.nfseNumber || undefined,
+          takerName: invoice.takerName || undefined,
+          asaasPaymentId: slideoverDetail.asaasPaymentId,
+          description: slideoverDetail.description,
+          requiresManualAction: !hasAsaasId,
+        });
 
         if (slideoverDetail.asaasPaymentId) {
           console.info(
@@ -114,6 +192,9 @@ export async function fetchAdaflowDeclarations(
           console.debug(
             `[PingouNota:Adaflow] ℹ️ Nota ${invoice.nfseNumber || invoice.adaflowNfseId} (${invoice.takerName || 'sem tomador'}): sem referência Asaas`,
           );
+          console.warn(
+            `⚠️ [Atenção: Ação Manual Requerida] Nota ${invoice.nfseNumber || invoice.adaflowNfseId} (${invoice.takerName || 'sem tomador'}): sem referência Asaas identificada na descrição.`,
+          );
           if (slideoverDetail.description) {
             console.debug(
               `[PingouNota:Adaflow] 📝 Descrição da nota ${invoice.nfseNumber || invoice.adaflowNfseId}: ${slideoverDetail.description}`,
@@ -126,17 +207,6 @@ export async function fetchAdaflowDeclarations(
           err,
         );
       }
-    }
-
-    if (pagination.nextHref) {
-      if (currentUrl.startsWith('http')) {
-        currentUrl = new URL(pagination.nextHref, currentUrl).toString();
-      } else {
-        const parsed = new URL(pagination.nextHref, 'https://app.adaflow.com');
-        currentUrl = parsed.pathname + parsed.search;
-      }
-    } else {
-      currentUrl = null;
     }
   }
 
@@ -152,5 +222,26 @@ export async function fetchAdaflowDeclarations(
   console.table(summary);
   console.groupEnd();
 
-  return reconciledDeclarations;
+  console.group('📋 Detalhe das Notas Fiscais Escaneadas');
+  console.table(
+    allScannedNotes.map((n) => ({
+      'NFSe Nº': n.nfseNumber || `ID ${n.adaflowNfseId}`,
+      'Tomador': n.takerName || 'N/A',
+      'ID Asaas': n.asaasPaymentId || '(nenhum)',
+      'Descrição': n.description || '',
+      'Ação Manual': n.requiresManualAction ? '⚠️ Sim' : 'Não',
+    })),
+  );
+  console.groupEnd();
+
+  const takers = Array.from(uniqueTakersMap.values());
+
+  const result = Object.assign(reconciledDeclarations, {
+    declarations: reconciledDeclarations,
+    pagesScanned: pagesFetched,
+    totalInvoicesFound: allScannedNotes.length,
+    takers,
+  });
+
+  return result as FetchAdaflowDeclarationsResult;
 }

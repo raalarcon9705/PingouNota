@@ -1,15 +1,20 @@
 import { browser } from 'wxt/browser';
 import { db, type PingouNotaDB } from '../storage/database';
+import type { TakerProfile } from '../domain/taker';
 import {
   fetchAdaflowDeclarations,
   type AdaflowReconciledDeclaration,
+  type AdaflowImportedTaker,
   type FetchAdaflowDeclarationsOptions,
+  type FetchAdaflowDeclarationsResult,
 } from './adaflow-scraper';
 
 export {
   fetchAdaflowDeclarations,
   type AdaflowReconciledDeclaration,
+  type AdaflowImportedTaker,
   type FetchAdaflowDeclarationsOptions,
+  type FetchAdaflowDeclarationsResult,
 };
 
 export const RECONCILIATION_AUDIT_STORAGE_KEY = 'last_reconciliation_audit';
@@ -28,6 +33,7 @@ export interface ReconciliationAuditRecord {
     date?: string;
     description?: string;
     status: 'updated' | 'already_declared' | 'not_found';
+    requiresManualAction?: boolean;
   }>;
 }
 
@@ -133,6 +139,72 @@ export function normalizeDateIso(dateStr?: string | null): string {
 }
 
 /**
+ * Upserts service takers extracted from Adaflow into db.takers.
+ */
+export async function importAdaflowTakers(
+  takers: Array<{ serviceTakerId?: string; name: string }>,
+  dbInstance: PingouNotaDB = db,
+): Promise<number> {
+  if (!takers || takers.length === 0) return 0;
+
+  let importedCount = 0;
+  await dbInstance.transaction('rw', dbInstance.takers, async () => {
+    for (const t of takers) {
+      if (!t.name || !t.name.trim()) continue;
+      const name = t.name.trim();
+      const slug =
+        name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '_')
+          .replace(/^_+|_+$/g, '') || String(Date.now());
+      const id = t.serviceTakerId || `taker_${slug}`;
+
+      const existing = await dbInstance.takers.get(id);
+      if (existing) {
+        let changed = false;
+        if (!existing.name && name) {
+          existing.name = name;
+          changed = true;
+        }
+        if (!existing.externalId && t.serviceTakerId) {
+          existing.externalId = t.serviceTakerId;
+          changed = true;
+        }
+        if (changed) {
+          existing.updatedAt = new Date().toISOString();
+          await dbInstance.takers.put(existing);
+          importedCount++;
+        }
+      } else {
+        const newTaker: TakerProfile = {
+          id,
+          name,
+          document: null,
+          externalId: t.serviceTakerId || null,
+          email: null,
+          address: {
+            line1: 'Importado Adaflow',
+            number: null,
+            neighborhood: null,
+            city: 'São Paulo',
+            state: 'SP',
+            postalCode: '01000-000',
+            country: 'Brasil',
+          },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        await dbInstance.takers.put(newTaker);
+        importedCount++;
+      }
+    }
+  });
+
+  console.info(`[PingouNota:Tomadores] 👥 ${takers.length} tomadores importados/atualizados da Adaflow.`);
+  return importedCount;
+}
+
+/**
  * Reconciles parsed Adaflow declarations against Asaas payments in IndexedDB.
  * Updates matching payments in 'nao_declarado' or 'falha_adaflow' state to 'marcado_localmente'
  * with manualDeclaredAt inside an atomic Dexie transaction.
@@ -140,7 +212,12 @@ export function normalizeDateIso(dateStr?: string | null): string {
 export async function reconcileAdaflowDeclarations(
   declarations: AdaflowReconciledDeclaration[],
   dbInstance: PingouNotaDB = db,
+  takers?: Array<{ serviceTakerId?: string; name: string }>,
 ): Promise<ReconcileAdaflowResult> {
+  if (takers && takers.length > 0) {
+    await importAdaflowTakers(takers, dbInstance);
+  }
+
   console.info(
     `[PingouNota:Reconciliação] 🔄 Iniciando conciliação de ${declarations.length} notas com pagamentos locais...`,
   );
@@ -184,6 +261,7 @@ export async function reconcileAdaflowDeclarations(
             date: decl.date,
             description: decl.description,
             status: 'updated',
+            requiresManualAction: false,
           });
         } else {
           alreadyDeclaredCount++;
@@ -197,12 +275,13 @@ export async function reconcileAdaflowDeclarations(
             date: decl.date,
             description: decl.description,
             status: 'already_declared',
+            requiresManualAction: false,
           });
         }
       } else {
         unmatchedCount++;
         console.warn(
-          `[PingouNota:Reconciliação] ⚠️ Cobrança Asaas ${decl.asaasPaymentId} (Nota ${decl.nfseNumber || decl.adaflowNfseId}): não encontrada na base local de pagamentos.`,
+          `[PingouNota:Reconciliação] ⚠️ [Atenção: Ação Manual Requerida] Cobrança Asaas ${decl.asaasPaymentId} (Nota ${decl.nfseNumber || decl.adaflowNfseId}): não encontrada na base local de pagamentos. Requer conferência manual.`,
         );
         details.push({
           asaasPaymentId: decl.asaasPaymentId,
@@ -211,6 +290,7 @@ export async function reconcileAdaflowDeclarations(
           date: decl.date,
           description: decl.description,
           status: 'not_found',
+          requiresManualAction: true,
         });
       }
     }

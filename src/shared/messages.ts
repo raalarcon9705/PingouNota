@@ -30,6 +30,12 @@ export type ExtensionMessage =
         pdfUrl?: string;
         description?: string;
       }>;
+      pagesScanned?: number;
+      totalInvoicesFound?: number;
+      takers?: Array<{
+        serviceTakerId?: string;
+        name: string;
+      }>;
     };
 
 export const extensionMessageSchema = z.discriminatedUnion('type', [
@@ -109,5 +115,15 @@ export const extensionMessageSchema = z.discriminatedUnion('type', [
         description: z.string().optional(),
       }),
     ),
+    pagesScanned: z.number().optional(),
+    totalInvoicesFound: z.number().optional(),
+    takers: z
+      .array(
+        z.object({
+          serviceTakerId: z.string().optional(),
+          name: z.string(),
+        }),
+      )
+      .optional(),
   }),
 ]);

@@ -39,12 +39,16 @@ export default defineContentScript({
       try {
         pill = createOrUpdatePill('PingouNota: Sincronizando notas fiscais emitidas...');
 
-        const declarations = await fetchAdaflowDeclarations();
+        const { declarations, pagesScanned, totalInvoicesFound, takers } =
+          await fetchAdaflowDeclarations();
 
-        if (declarations.length > 0) {
+        if (declarations.length > 0 || (takers && takers.length > 0)) {
           const message: ExtensionMessage = {
             type: 'ADAFLOW_RECONCILIATION_OBSERVED',
             declarations,
+            pagesScanned,
+            totalInvoicesFound,
+            takers,
           };
 
           const response = (await browser.runtime.sendMessage(message)) as {
@@ -56,11 +60,13 @@ export default defineContentScript({
           const count = response?.matchedCount ?? 0;
           if (count > 0) {
             createOrUpdatePill(`PingouNota: ${count} notas conciliadas com sucesso!`, 5000);
-          } else {
+          } else if (declarations.length > 0) {
             createOrUpdatePill('PingouNota: Nenhuma nota correspondente no Asaas.', 5000);
+          } else {
+            createOrUpdatePill('PingouNota: Tomadores sincronizados com sucesso!', 5000);
           }
         } else {
-          createOrUpdatePill('PingouNota: Nenhuma nota correspondente no Asaas.', 5000);
+          createOrUpdatePill('PingouNota: Nenhuma nota encontrada.', 5000);
         }
       } catch (err) {
         console.error('[PingouNota] Erro durante auto-conciliação Adaflow:', err);

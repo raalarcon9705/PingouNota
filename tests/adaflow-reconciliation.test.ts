@@ -4,6 +4,7 @@ import type { Payment } from '../src/domain/payment';
 import {
   fetchAdaflowDeclarations,
   getLastReconciliationAudit,
+  importAdaflowTakers,
   normalizeDateIso,
   reconcileAdaflowDeclarations,
   _resetMemoryAuditForTesting,
@@ -151,6 +152,7 @@ describe('Adaflow Reconciliation Service', () => {
         date: '17/10/2026',
         description: 'Prestação de serviço de software 1001',
         status: 'updated',
+        requiresManualAction: false,
       });
       expect(audit?.details[1]).toEqual({
         asaasPaymentId: '1002',
@@ -159,6 +161,7 @@ describe('Adaflow Reconciliation Service', () => {
         date: '18/10/2026',
         description: 'Consultoria técnica 1002',
         status: 'already_declared',
+        requiresManualAction: false,
       });
       expect(audit?.details[2]).toEqual({
         asaasPaymentId: '1003',
@@ -167,6 +170,7 @@ describe('Adaflow Reconciliation Service', () => {
         date: undefined,
         description: undefined,
         status: 'not_found',
+        requiresManualAction: true,
       });
       expect(audit?.details[3]).toEqual({
         asaasPaymentId: '9999',
@@ -175,6 +179,7 @@ describe('Adaflow Reconciliation Service', () => {
         date: undefined,
         description: undefined,
         status: 'not_found',
+        requiresManualAction: true,
       });
       expect(result.audit).toEqual(audit);
 
@@ -189,10 +194,10 @@ describe('Adaflow Reconciliation Service', () => {
         expect.stringContaining('[PingouNota:Reconciliação] ℹ️ Cobrança Asaas 1002: já estava declarada'),
       );
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[PingouNota:Reconciliação] ⚠️ Cobrança Asaas 1003 (Nota Nº 3): não encontrada'),
+        expect.stringContaining('[Atenção: Ação Manual Requerida] Cobrança Asaas 1003 (Nota Nº 3): não encontrada'),
       );
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[PingouNota:Reconciliação] ⚠️ Cobrança Asaas 9999 (Nota 8884): não encontrada'),
+        expect.stringContaining('[Atenção: Ação Manual Requerida] Cobrança Asaas 9999 (Nota 8884): não encontrada'),
       );
       expect(infoSpy).toHaveBeenCalledWith(
         expect.stringContaining('[PingouNota:Reconciliação] 📊 Conciliação finalizada: 2 correspondências (1 recém-marcadas, 1 já declaradas, 2 não encontradas no Asaas).'),
@@ -310,6 +315,7 @@ describe('Adaflow Reconciliation Service', () => {
       const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
       const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
       const groupSpy = vi.spyOn(console, 'groupCollapsed').mockImplementation(() => {});
+      const openGroupSpy = vi.spyOn(console, 'group').mockImplementation(() => {});
       const tableSpy = vi.spyOn(console, 'table').mockImplementation(() => {});
       const groupEndSpy = vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
 
@@ -339,6 +345,14 @@ describe('Adaflow Reconciliation Service', () => {
         description: 'Fatura mensal Asaas #99887766',
       });
 
+      expect(declarations.pagesScanned).toBe(2);
+      expect(declarations.totalInvoicesFound).toBe(3);
+      expect(declarations.takers).toEqual([
+        { serviceTakerId: undefined, name: 'Empresa A' },
+        { serviceTakerId: undefined, name: 'Empresa B' },
+        { serviceTakerId: undefined, name: 'Empresa C' },
+      ]);
+
       // Verify scraper logs
       expect(infoSpy).toHaveBeenCalledWith(
         expect.stringContaining('[PingouNota:Adaflow] 🔍 Iniciando auditoria de notas fiscais emitidas...'),
@@ -355,12 +369,16 @@ describe('Adaflow Reconciliation Service', () => {
       expect(groupSpy).toHaveBeenCalledWith(
         expect.stringContaining('[PingouNota:Adaflow] 📊 Resumo de notas com referência Asaas encontradas'),
       );
-      expect(tableSpy).toHaveBeenCalledTimes(1);
-      expect(groupEndSpy).toHaveBeenCalledTimes(1);
+      expect(openGroupSpy).toHaveBeenCalledWith(
+        expect.stringContaining('📋 Detalhe das Notas Fiscais Escaneadas'),
+      );
+      expect(tableSpy).toHaveBeenCalledTimes(2);
+      expect(groupEndSpy).toHaveBeenCalledTimes(2);
 
       infoSpy.mockRestore();
       debugSpy.mockRestore();
       groupSpy.mockRestore();
+      openGroupSpy.mockRestore();
       tableSpy.mockRestore();
       groupEndSpy.mockRestore();
     });
@@ -444,6 +462,67 @@ describe('Adaflow Reconciliation Service', () => {
     });
   });
 
+  describe('importAdaflowTakers', () => {
+    it('imports new takers and generates IDs appropriately', async () => {
+      const takers = [
+        { serviceTakerId: '21116', name: 'Avanto LLC' },
+        { name: 'Empresa Sem ID' },
+      ];
+
+      const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+
+      const imported = await importAdaflowTakers(takers, testDb);
+      expect(imported).toBe(2);
+
+      const t1 = await testDb.takers.get('21116');
+      expect(t1).toBeDefined();
+      expect(t1?.name).toBe('Avanto LLC');
+      expect(t1?.externalId).toBe('21116');
+      expect(t1?.address.city).toBe('São Paulo');
+
+      const allTakers = await testDb.takers.toArray();
+      expect(allTakers).toHaveLength(2);
+      const t2 = allTakers.find((t) => t.name === 'Empresa Sem ID');
+      expect(t2).toBeDefined();
+      expect(t2?.id).toContain('taker_empresa_sem_id');
+
+      expect(infoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[PingouNota:Tomadores] 👥 2 tomadores importados/atualizados da Adaflow.'),
+      );
+
+      infoSpy.mockRestore();
+    });
+
+    it('does not overwrite existing complete taker records', async () => {
+      await testDb.takers.put({
+        id: '21116',
+        name: 'Avanto Original',
+        document: '12.345.678/0001-90',
+        externalId: '21116',
+        email: 'contato@avanto.com',
+        address: {
+          line1: 'Rua Principal',
+          number: '100',
+          neighborhood: 'Centro',
+          city: 'Curitiba',
+          state: 'PR',
+          postalCode: '80000-000',
+          country: 'Brasil',
+        },
+      });
+
+      const imported = await importAdaflowTakers(
+        [{ serviceTakerId: '21116', name: 'Avanto LLC' }],
+        testDb,
+      );
+
+      expect(imported).toBe(0);
+      const after = await testDb.takers.get('21116');
+      expect(after?.name).toBe('Avanto Original');
+      expect(after?.document).toBe('12.345.678/0001-90');
+    });
+  });
+
   describe('ADAFLOW_RECONCILIATION_OBSERVED message schema', () => {
     it('validates correct ADAFLOW_RECONCILIATION_OBSERVED message', () => {
       const validMsg = {
@@ -486,6 +565,40 @@ describe('Adaflow Reconciliation Service', () => {
         expect(result.data.declarations[0]?.description).toBe(
           'Serviços de desenvolvimento de software referente à cobrança Asaas 9988',
         );
+      }
+    });
+
+    it('validates message with pagesScanned, totalInvoicesFound, and takers', () => {
+      const validMsgWithStats = {
+        type: 'ADAFLOW_RECONCILIATION_OBSERVED',
+        declarations: [
+          {
+            asaasPaymentId: 'pay_9988',
+            adaflowNfseId: 12345,
+            nfseNumber: 'Nº 50',
+          },
+        ],
+        pagesScanned: 3,
+        totalInvoicesFound: 15,
+        takers: [
+          {
+            serviceTakerId: '21116',
+            name: 'Avanto LLC',
+          },
+        ],
+      };
+
+      const result = extensionMessageSchema.safeParse(validMsgWithStats);
+      expect(result.success).toBe(true);
+      if (result.success && result.data.type === 'ADAFLOW_RECONCILIATION_OBSERVED') {
+        expect(result.data.pagesScanned).toBe(3);
+        expect(result.data.totalInvoicesFound).toBe(15);
+        expect(result.data.takers).toEqual([
+          {
+            serviceTakerId: '21116',
+            name: 'Avanto LLC',
+          },
+        ]);
       }
     });
 
