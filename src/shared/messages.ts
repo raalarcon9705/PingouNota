@@ -28,6 +28,7 @@ export type ExtensionMessage =
         date?: string;
         amountCents?: number;
         pdfUrl?: string;
+        description?: string;
       }>;
     };
 
@@ -105,6 +106,7 @@ export const extensionMessageSchema = z.discriminatedUnion('type', [
         date: z.string().optional(),
         amountCents: z.number().optional(),
         pdfUrl: z.string().optional(),
+        description: z.string().optional(),
       }),
     ),
   }),

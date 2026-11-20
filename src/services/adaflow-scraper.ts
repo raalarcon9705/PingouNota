@@ -10,6 +10,7 @@ export interface AdaflowReconciledDeclaration {
   date?: string;
   amountCents?: number;
   pdfUrl?: string;
+  description?: string;
 }
 
 export interface FetchAdaflowDeclarationsOptions {
@@ -29,6 +30,8 @@ export async function fetchAdaflowDeclarations(
   const startUrl = options.startUrl ?? '/nfses';
   const maxPages = options.maxPages ?? 10;
   const fetchFn = options.fetchFn ?? globalThis.fetch;
+
+  console.info('[PingouNota:Adaflow] 🔍 Iniciando auditoria de notas fiscais emitidas...');
 
   let currentUrl: string | null = startUrl;
   let pagesFetched = 0;
@@ -60,6 +63,12 @@ export async function fetchAdaflowDeclarations(
     }
 
     const { invoices, pagination } = parseAdaflowInvoicesPage(html);
+    const currentPage = pagination.currentPage || pagesFetched;
+    const nextHref = pagination.nextHref;
+
+    console.info(
+      `[PingouNota:Adaflow] 📄 Página ${currentPage}: ${invoices.length} notas encontradas. Próxima: ${nextHref || 'fim'}`,
+    );
 
     for (const invoice of invoices) {
       try {
@@ -84,6 +93,14 @@ export async function fetchAdaflowDeclarations(
         const slideoverDetail = parseAdaflowSlideover(detailHtml);
 
         if (slideoverDetail.asaasPaymentId) {
+          console.info(
+            `[PingouNota:Adaflow] ✅ Nota ${invoice.nfseNumber || invoice.adaflowNfseId} -> Vinculada à cobrança Asaas nº ${slideoverDetail.asaasPaymentId}`,
+          );
+          if (slideoverDetail.description) {
+            console.debug(
+              `[PingouNota:Adaflow] 📝 Descrição da nota ${invoice.nfseNumber || invoice.adaflowNfseId}: ${slideoverDetail.description}`,
+            );
+          }
           reconciledDeclarations.push({
             asaasPaymentId: slideoverDetail.asaasPaymentId,
             adaflowNfseId: invoice.adaflowNfseId,
@@ -91,7 +108,17 @@ export async function fetchAdaflowDeclarations(
             date: invoice.date || undefined,
             amountCents: invoice.amountCents,
             pdfUrl: invoice.pdfUrl,
+            description: slideoverDetail.description,
           });
+        } else {
+          console.debug(
+            `[PingouNota:Adaflow] ℹ️ Nota ${invoice.nfseNumber || invoice.adaflowNfseId} (${invoice.takerName || 'sem tomador'}): sem referência Asaas`,
+          );
+          if (slideoverDetail.description) {
+            console.debug(
+              `[PingouNota:Adaflow] 📝 Descrição da nota ${invoice.nfseNumber || invoice.adaflowNfseId}: ${slideoverDetail.description}`,
+            );
+          }
         }
       } catch (err) {
         console.warn(
@@ -112,6 +139,18 @@ export async function fetchAdaflowDeclarations(
       currentUrl = null;
     }
   }
+
+  const summary = reconciledDeclarations.map((item) => ({
+    'ID Asaas': item.asaasPaymentId,
+    'NFSe Nº': item.nfseNumber || `ID ${item.adaflowNfseId}`,
+    'Data': item.date || 'N/A',
+    'Valor (R$)': item.amountCents !== undefined ? (item.amountCents / 100).toFixed(2) : 'N/A',
+    'Descrição': item.description || '',
+  }));
+
+  console.groupCollapsed('[PingouNota:Adaflow] 📊 Resumo de notas com referência Asaas encontradas');
+  console.table(summary);
+  console.groupEnd();
 
   return reconciledDeclarations;
 }

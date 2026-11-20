@@ -129,6 +129,48 @@ describe('Asaas Adapters & Authenticated Fetch Strategy', () => {
       expect(result.payments[1]?.amountCents).toBe(1190);
     });
 
+    it('logs structured audit info with table to console', async () => {
+      const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+      const groupSpy = vi.spyOn(console, 'groupCollapsed').mockImplementation(() => {});
+      const tableSpy = vi.spyOn(console, 'table').mockImplementation(() => {});
+      const groupEndSpy = vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
+
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          content: sampleRowHtml1,
+          totalRecords: 1,
+          message: '',
+        }),
+      });
+
+      await fetchAsaasPayments(1, 50, undefined, mockFetch as unknown as typeof fetch);
+
+      expect(infoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[PingouNota:Asaas] 🔍 Escaneando cobranças... Página 1: 1 encontradas (Total acumulado: 1 de 1)'),
+      );
+      expect(groupSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[PingouNota:Asaas] 📋 Cobranças sincronizadas (1 pagamentos)'),
+      );
+      expect(tableSpy).toHaveBeenCalledWith([
+        {
+          ID: '967583773',
+          Pagador: 'Caio Tiburcio',
+          Valor: 47,
+          Estado: 'recebido',
+          Status: 'Recebida em 13/11/2026',
+        },
+      ]);
+      expect(groupEndSpy).toHaveBeenCalledTimes(1);
+
+      infoSpy.mockRestore();
+      groupSpy.mockRestore();
+      tableSpy.mockRestore();
+      groupEndSpy.mockRestore();
+    });
+
     it('always returns pagination: end even if maxPages limits further fetching', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,

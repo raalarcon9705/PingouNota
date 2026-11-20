@@ -63,6 +63,21 @@ export default defineContentScript({
         // Fallback: DOM scanning
         console.warn?.('[PingouNota] Authenticated fetch failed, falling back to DOM parsing:', fetchErr);
         result = asaasAdapter.parse(document);
+        const allPayments = result.payments;
+        console.info(
+          `[PingouNota:Asaas] 🔍 Escaneando cobranças... Página 1: ${allPayments.length} encontradas (Total acumulado: ${allPayments.length} de ${allPayments.length})`,
+        );
+        console.groupCollapsed(`[PingouNota:Asaas] 📋 Cobranças sincronizadas (${allPayments.length} pagamentos)`);
+        console.table(
+          allPayments.map((p) => ({
+            ID: p.sourcePaymentId,
+            Pagador: p.payerName,
+            Valor: (p.amountCents || 0) / 100,
+            Estado: p.paymentState,
+            Status: p.sourceStatus,
+          })),
+        );
+        console.groupEnd();
       }
 
       const observedMsg: ExtensionMessage = {

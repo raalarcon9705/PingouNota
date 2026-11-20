@@ -141,6 +141,14 @@ export async function fetchAsaasPayments(
     const pageSize = (firstPage.content.match(/<atlas-table-row/g) || []).length || itemsPerPage;
     const totalPages = Math.ceil(totalRecords / pageSize);
 
+    const firstDoc = new DOMParser().parseFromString(firstPage.content, 'text/html');
+    const firstResult = parseAsaasPayments(firstDoc);
+    const accumulated = [...firstResult.payments];
+
+    console.info(
+      `[PingouNota:Asaas] 🔍 Escaneando cobranças... Página ${page}: ${firstResult.payments.length} encontradas (Total acumulado: ${accumulated.length} de ${totalRecords})`,
+    );
+
     // If there are more pages, fetch remaining pages up to maxPages
     if (totalPages > 1 && maxPages > 1) {
       const lastPageToFetch = Math.min(totalPages, page + maxPages - 1);
@@ -148,6 +156,12 @@ export async function fetchAsaasPayments(
         for (let p = page + 1; p <= lastPageToFetch; p++) {
           const nextData = await fetchSinglePage(p);
           combinedContent += '\n' + nextData.content;
+          const pageDoc = new DOMParser().parseFromString(nextData.content, 'text/html');
+          const pageResult = parseAsaasPayments(pageDoc);
+          accumulated.push(...pageResult.payments);
+          console.info(
+            `[PingouNota:Asaas] 🔍 Escaneando cobranças... Página ${p}: ${pageResult.payments.length} encontradas (Total acumulado: ${accumulated.length} de ${totalRecords})`,
+          );
         }
       } catch (loopErr) {
         console.warn?.('[PingouNota] Failed to fetch subsequent page, parsing partial batch:', loopErr);
@@ -156,6 +170,19 @@ export async function fetchAsaasPayments(
 
     const parsedDoc = new DOMParser().parseFromString(combinedContent, 'text/html');
     const result = parseAsaasPayments(parsedDoc);
+    const allPayments = result.payments;
+
+    console.groupCollapsed(`[PingouNota:Asaas] 📋 Cobranças sincronizadas (${allPayments.length} pagamentos)`);
+    console.table(
+      allPayments.map((p) => ({
+        ID: p.sourcePaymentId,
+        Pagador: p.payerName,
+        Valor: (p.amountCents || 0) / 100,
+        Estado: p.paymentState,
+        Status: p.sourceStatus,
+      })),
+    );
+    console.groupEnd();
 
     return {
       ...result,
@@ -163,7 +190,23 @@ export async function fetchAsaasPayments(
     };
   } catch (err) {
     if (currentDoc) {
-      return asaasAdapter.parse(currentDoc);
+      const parsed = asaasAdapter.parse(currentDoc);
+      const allPayments = parsed.payments;
+      console.info(
+        `[PingouNota:Asaas] 🔍 Escaneando cobranças... Página 1: ${allPayments.length} encontradas (Total acumulado: ${allPayments.length} de ${allPayments.length})`,
+      );
+      console.groupCollapsed(`[PingouNota:Asaas] 📋 Cobranças sincronizadas (${allPayments.length} pagamentos)`);
+      console.table(
+        allPayments.map((p) => ({
+          ID: p.sourcePaymentId,
+          Pagador: p.payerName,
+          Valor: (p.amountCents || 0) / 100,
+          Estado: p.paymentState,
+          Status: p.sourceStatus,
+        })),
+      );
+      console.groupEnd();
+      return parsed;
     }
     return {
       payments: [],

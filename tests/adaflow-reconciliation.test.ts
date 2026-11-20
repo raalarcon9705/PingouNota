@@ -3,8 +3,10 @@ import { createDatabase, type PingouNotaDB } from '../src/storage/database';
 import type { Payment } from '../src/domain/payment';
 import {
   fetchAdaflowDeclarations,
+  getLastReconciliationAudit,
   normalizeDateIso,
   reconcileAdaflowDeclarations,
+  _resetMemoryAuditForTesting,
   type AdaflowReconciledDeclaration,
 } from '../src/services/adaflow-reconciliation';
 import { extensionMessageSchema } from '../src/shared/messages';
@@ -13,6 +15,7 @@ describe('Adaflow Reconciliation Service', () => {
   let testDb: PingouNotaDB;
 
   beforeEach(async () => {
+    _resetMemoryAuditForTesting();
     testDb = createDatabase(`test-db-${Date.now()}-${Math.random()}`);
     await testDb.payments.clear();
   });
@@ -91,6 +94,7 @@ describe('Adaflow Reconciliation Service', () => {
           nfseNumber: 'Nº 1',
           date: '17/10/2026',
           amountCents: 15000,
+          description: 'Prestação de serviço de software 1001',
         },
         {
           asaasPaymentId: '1002',
@@ -98,6 +102,7 @@ describe('Adaflow Reconciliation Service', () => {
           nfseNumber: 'Nº 2',
           date: '18/10/2026',
           amountCents: 20000,
+          description: 'Consultoria técnica 1002',
         },
         {
           asaasPaymentId: '1003', // husky provider should not match
@@ -109,6 +114,9 @@ describe('Adaflow Reconciliation Service', () => {
           adaflowNfseId: 8884,
         },
       ];
+
+      const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       const result = await reconcileAdaflowDeclarations(declarations, testDb);
 
@@ -126,6 +134,72 @@ describe('Adaflow Reconciliation Service', () => {
 
       const unchangedHusky = await testDb.payments.get(['husky', 'rec_03']);
       expect(unchangedHusky?.declarationState).toBe('nao_declarado');
+
+      // Verify audit trail record structure and storage
+      const audit = await getLastReconciliationAudit();
+      expect(audit).not.toBeNull();
+      expect(audit?.declarationsFound).toBe(4);
+      expect(audit?.matchedCount).toBe(2);
+      expect(audit?.updatedCount).toBe(1);
+      expect(audit?.alreadyDeclaredCount).toBe(1);
+      expect(audit?.unmatchedCount).toBe(2);
+      expect(audit?.details).toHaveLength(4);
+      expect(audit?.details[0]).toEqual({
+        asaasPaymentId: '1001',
+        nfseNumber: 'Nº 1',
+        adaflowNfseId: 8881,
+        date: '17/10/2026',
+        description: 'Prestação de serviço de software 1001',
+        status: 'updated',
+      });
+      expect(audit?.details[1]).toEqual({
+        asaasPaymentId: '1002',
+        nfseNumber: 'Nº 2',
+        adaflowNfseId: 8882,
+        date: '18/10/2026',
+        description: 'Consultoria técnica 1002',
+        status: 'already_declared',
+      });
+      expect(audit?.details[2]).toEqual({
+        asaasPaymentId: '1003',
+        nfseNumber: 'Nº 3',
+        adaflowNfseId: 8883,
+        date: undefined,
+        description: undefined,
+        status: 'not_found',
+      });
+      expect(audit?.details[3]).toEqual({
+        asaasPaymentId: '9999',
+        nfseNumber: undefined,
+        adaflowNfseId: 8884,
+        date: undefined,
+        description: undefined,
+        status: 'not_found',
+      });
+      expect(result.audit).toEqual(audit);
+
+      // Verify console logs
+      expect(infoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[PingouNota:Reconciliação] 🔄 Iniciando conciliação de 4 notas'),
+      );
+      expect(infoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[PingouNota:Reconciliação] ✅ Cobrança Asaas 1001: marcada como DECLARADA'),
+      );
+      expect(infoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[PingouNota:Reconciliação] ℹ️ Cobrança Asaas 1002: já estava declarada'),
+      );
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[PingouNota:Reconciliação] ⚠️ Cobrança Asaas 1003 (Nota Nº 3): não encontrada'),
+      );
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[PingouNota:Reconciliação] ⚠️ Cobrança Asaas 9999 (Nota 8884): não encontrada'),
+      );
+      expect(infoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[PingouNota:Reconciliação] 📊 Conciliação finalizada: 2 correspondências (1 recém-marcadas, 1 já declaradas, 2 não encontradas no Asaas).'),
+      );
+
+      infoSpy.mockRestore();
+      warnSpy.mockRestore();
     });
 
     it('reconciles payments in falha_adaflow state to marcado_localmente', async () => {
@@ -233,6 +307,12 @@ describe('Adaflow Reconciliation Service', () => {
         return new Response('Not found', { status: 404 });
       });
 
+      const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+      const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+      const groupSpy = vi.spyOn(console, 'groupCollapsed').mockImplementation(() => {});
+      const tableSpy = vi.spyOn(console, 'table').mockImplementation(() => {});
+      const groupEndSpy = vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
+
       const declarations = await fetchAdaflowDeclarations({
         startUrl: '/nfses',
         maxPages: 10,
@@ -247,6 +327,7 @@ describe('Adaflow Reconciliation Service', () => {
         date: '15/10/2026',
         amountCents: 10000,
         pdfUrl: '/files/nf-10.pdf',
+        description: 'Serviço de suporte referente à cobrança Asaas nº 55443322',
       });
       expect(declarations[1]).toEqual({
         asaasPaymentId: '99887766',
@@ -255,7 +336,33 @@ describe('Adaflow Reconciliation Service', () => {
         date: '17/10/2026',
         amountCents: 30000,
         pdfUrl: undefined,
+        description: 'Fatura mensal Asaas #99887766',
       });
+
+      // Verify scraper logs
+      expect(infoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[PingouNota:Adaflow] 🔍 Iniciando auditoria de notas fiscais emitidas...'),
+      );
+      expect(infoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[PingouNota:Adaflow] 📄 Página 1: 2 notas encontradas. Próxima: /nfses?page=2'),
+      );
+      expect(infoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[PingouNota:Adaflow] ✅ Nota Nº 10 -> Vinculada à cobrança Asaas nº 55443322'),
+      );
+      expect(debugSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[PingouNota:Adaflow] ℹ️ Nota Nº 11 (Empresa B): sem referência Asaas'),
+      );
+      expect(groupSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[PingouNota:Adaflow] 📊 Resumo de notas com referência Asaas encontradas'),
+      );
+      expect(tableSpy).toHaveBeenCalledTimes(1);
+      expect(groupEndSpy).toHaveBeenCalledTimes(1);
+
+      infoSpy.mockRestore();
+      debugSpy.mockRestore();
+      groupSpy.mockRestore();
+      tableSpy.mockRestore();
+      groupEndSpy.mockRestore();
     });
 
     it('handles individual slideover fetch failure gracefully without aborting run', async () => {
@@ -357,6 +464,31 @@ describe('Adaflow Reconciliation Service', () => {
       expect(result.success).toBe(true);
     });
 
+    it('validates message with description field', () => {
+      const validMsgWithDesc = {
+        type: 'ADAFLOW_RECONCILIATION_OBSERVED',
+        declarations: [
+          {
+            asaasPaymentId: 'pay_9988',
+            adaflowNfseId: 12345,
+            nfseNumber: 'Nº 50',
+            date: '17/10/2026',
+            amountCents: 15000,
+            pdfUrl: 'https://app.adaflow.com/nf-50.pdf',
+            description: 'Serviços de desenvolvimento de software referente à cobrança Asaas 9988',
+          },
+        ],
+      };
+
+      const result = extensionMessageSchema.safeParse(validMsgWithDesc);
+      expect(result.success).toBe(true);
+      if (result.success && result.data.type === 'ADAFLOW_RECONCILIATION_OBSERVED') {
+        expect(result.data.declarations[0]?.description).toBe(
+          'Serviços de desenvolvimento de software referente à cobrança Asaas 9988',
+        );
+      }
+    });
+
     it('rejects invalid message missing required fields', () => {
       const invalidMsg = {
         type: 'ADAFLOW_RECONCILIATION_OBSERVED',
@@ -370,6 +502,60 @@ describe('Adaflow Reconciliation Service', () => {
 
       const result = extensionMessageSchema.safeParse(invalidMsg);
       expect(result.success).toBe(false);
+    });
+  });
+
+  describe('Storage persistence for reconciliation audit', () => {
+    it('persists audit record in chrome.storage.local when available', async () => {
+      const storageMock: Record<string, unknown> = {};
+      const originalChrome = (globalThis as unknown as { chrome?: unknown }).chrome;
+
+      (globalThis as unknown as { chrome: unknown }).chrome = {
+        storage: {
+          local: {
+            get: vi.fn((keys: string[], cb: (res: Record<string, unknown>) => void) => {
+              const res: Record<string, unknown> = {};
+              for (const k of keys) {
+                if (storageMock[k] !== undefined) res[k] = storageMock[k];
+              }
+              cb(res);
+            }),
+            set: vi.fn((data: Record<string, unknown>, cb?: () => void) => {
+              Object.assign(storageMock, data);
+              cb?.();
+            }),
+          },
+        },
+      };
+
+      try {
+        const p1 = makePayment({
+          recordKey: 'rec_s1',
+          sourcePaymentId: 'pay_audit_test',
+          declarationState: 'nao_declarado',
+        });
+        await testDb.payments.put(p1);
+
+        const declarations: AdaflowReconciledDeclaration[] = [
+          {
+            asaasPaymentId: 'pay_audit_test',
+            adaflowNfseId: 7777,
+            nfseNumber: 'Nº 77',
+            date: '20/11/2026',
+            description: 'Serviço prestado com sucesso',
+          },
+        ];
+
+        await reconcileAdaflowDeclarations(declarations, testDb);
+
+        const audit = await getLastReconciliationAudit();
+        expect(audit).not.toBeNull();
+        expect(audit?.details[0]?.asaasPaymentId).toBe('pay_audit_test');
+        expect(audit?.details[0]?.description).toBe('Serviço prestado com sucesso');
+        expect(storageMock['last_reconciliation_audit']).toEqual(audit);
+      } finally {
+        (globalThis as unknown as { chrome: unknown }).chrome = originalChrome;
+      }
     });
   });
 });
