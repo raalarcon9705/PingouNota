@@ -85,13 +85,13 @@ describe('App Navigation and Tab Integration', () => {
         id: 'prop-taker-1',
         name: 'Cliente Proposto 1',
         serviceTakerId: '101',
-        discoveredAt: new Date().toISOString(),
+        suggestedAt: new Date().toISOString(),
       },
       {
         id: 'prop-taker-2',
         name: 'Cliente Proposto 2',
         serviceTakerId: '102',
-        discoveredAt: new Date().toISOString(),
+        suggestedAt: new Date().toISOString(),
       },
     ]);
 
@@ -100,7 +100,7 @@ describe('App Navigation and Tab Integration', () => {
         id: 'prop-tmpl-1',
         name: 'Modelo Proposto 1',
         description: 'Serviços prestados proposta 1',
-        discoveredAt: new Date().toISOString(),
+        suggestedAt: new Date().toISOString(),
       },
     ]);
 

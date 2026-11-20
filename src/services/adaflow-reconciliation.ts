@@ -2,6 +2,8 @@ import { browser } from 'wxt/browser';
 import { db, type PingouNotaDB } from '../storage/database';
 import type { TakerProfile } from '../domain/taker';
 import type { ServiceTemplate } from '../domain/template';
+import { saveTaker } from './takers';
+import { saveTemplate } from './templates';
 import {
   fetchAdaflowDeclarations,
   type AdaflowReconciledDeclaration,
@@ -207,11 +209,7 @@ export async function approveProposedTaker(
   taker: TakerProfile,
   dbInstance: PingouNotaDB = db,
 ): Promise<void> {
-  await dbInstance.takers.put({
-    ...taker,
-    createdAt: taker.createdAt || new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  });
+  await saveTaker(taker, dbInstance);
   const current = await getProposedTakers();
   const filtered = current.filter((p) => p.id !== id);
   await saveProposedTakers(filtered);
@@ -286,11 +284,7 @@ export async function approveProposedTemplate(
   template: ServiceTemplate,
   dbInstance: PingouNotaDB = db,
 ): Promise<void> {
-  await dbInstance.templates.put({
-    ...template,
-    createdAt: template.createdAt || new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  });
+  await saveTemplate(template, dbInstance);
   const current = await getProposedTemplates();
   const filtered = current.filter((p) => p.id !== id);
   await saveProposedTemplates(filtered);

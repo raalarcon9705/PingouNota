@@ -64,6 +64,7 @@ export function takerProfileToAdaflowTaker(
     external_id: profile.externalId || undefined,
     name: profile.name,
     email: profile.email || undefined,
+    phone: profile.phone || undefined,
     address: {
       line1: profile.address.line1,
       number: profile.address.number || undefined,
