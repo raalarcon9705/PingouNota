@@ -318,6 +318,10 @@ describe('Adaflow Reconciliation Service', () => {
       _resetSyncStateForTesting();
     });
 
+    it('defines storage key correctly', () => {
+      expect(ADAFLOW_SYNC_STATE_STORAGE_KEY).toBe('adaflow_sync_state');
+    });
+
     it('returns null when no sync state has been recorded', async () => {
       const state = await getAdaflowSyncState();
       expect(state).toBeNull();
