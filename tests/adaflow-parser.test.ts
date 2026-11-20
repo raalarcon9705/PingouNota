@@ -53,7 +53,7 @@ describe('Adaflow Parser', () => {
   });
 
   describe('extractAsaasPaymentId', () => {
-    it('extracts ID using primary regex (referente à cobrança Asaas nº {id})', () => {
+    it('extracts ID using primary regex (referente [aà] cobran[çc]a Asaas (nº/num/no/.) {id})', () => {
       expect(
         extractAsaasPaymentId(
           'Serviços de desenvolvimento de software referente à cobrança Asaas nº 12345678',
@@ -66,11 +66,44 @@ describe('Adaflow Parser', () => {
           'Referente à cobranca Asaas Nº 87654321 prestação de serviço',
         ),
       ).toBe('87654321');
+
+      // Variant with "referente a", "num."
+      expect(
+        extractAsaasPaymentId(
+          'Serviços referente a cobranca Asaas num. 55667788',
+        ),
+      ).toBe('55667788');
+
+      // Variant with "referente a", "no", no dot
+      expect(
+        extractAsaasPaymentId(
+          'referente a cobrança Asaas no 44332211',
+        ),
+      ).toBe('44332211');
+
+      // Variant directly following Asaas with number
+      expect(
+        extractAsaasPaymentId(
+          'referente a cobrança Asaas 11223344',
+        ),
+      ).toBe('11223344');
     });
 
-    it('extracts ID using fallback: Asaas nº {id}', () => {
+    it('extracts ID using fallback: Asaas (nº/num/no/#) {id}', () => {
       expect(
         extractAsaasPaymentId('Consultoria técnica - Asaas nº 99887766'),
+      ).toBe('99887766');
+
+      expect(
+        extractAsaasPaymentId('Consultoria técnica - Asaas num. 99887766'),
+      ).toBe('99887766');
+
+      expect(
+        extractAsaasPaymentId('Consultoria técnica - Asaas no 99887766'),
+      ).toBe('99887766');
+
+      expect(
+        extractAsaasPaymentId('Consultoria técnica - Asaas n. 99887766'),
       ).toBe('99887766');
     });
 
@@ -80,7 +113,7 @@ describe('Adaflow Parser', () => {
       ).toBe('55443322');
     });
 
-    it('extracts ID using fallback: Asaas #{id} and Asaas {7-12 digits}', () => {
+    it('extracts ID using fallback: Asaas #{id} and Asaas {digits}', () => {
       expect(
         extractAsaasPaymentId('Fatura ref Asaas #1234567'),
       ).toBe('1234567');

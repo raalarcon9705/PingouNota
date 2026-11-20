@@ -1,12 +1,17 @@
 import { browser } from 'wxt/browser';
-import { fetchAdaflowDeclarations } from '../src/services/adaflow-reconciliation';
+import { fetchAdaflowDeclarations } from '../src/services/adaflow-scraper';
 import type { ExtensionMessage } from '../src/shared/messages';
 
 declare global {
   interface Window {
     __pingounota_adaflow_reconciling?: boolean;
+    __pingounota_adaflow_last_reconciled?: number;
   }
 }
+
+const RECONCILIATION_COOLDOWN_MS = 60_000;
+let dismissTimer: ReturnType<typeof setTimeout> | null = null;
+let removeTimer: ReturnType<typeof setTimeout> | null = null;
 
 export default defineContentScript({
   matches: ['https://app.adaflow.com/*'],
@@ -20,7 +25,15 @@ export default defineContentScript({
       if (window.__pingounota_adaflow_reconciling) {
         return;
       }
+
+      const now = Date.now();
+      const lastReconciled = window.__pingounota_adaflow_last_reconciled ?? 0;
+      if (now - lastReconciled < RECONCILIATION_COOLDOWN_MS) {
+        return;
+      }
+
       window.__pingounota_adaflow_reconciling = true;
+      window.__pingounota_adaflow_last_reconciled = now;
 
       let pill: HTMLDivElement | null = null;
       try {
@@ -40,10 +53,14 @@ export default defineContentScript({
             updatedCount?: number;
           } | null;
 
-          const count = response?.matchedCount ?? declarations.length;
-          createOrUpdatePill(`PingouNota: ${count} notas conciliadas com sucesso!`, 5000);
+          const count = response?.matchedCount ?? 0;
+          if (count > 0) {
+            createOrUpdatePill(`PingouNota: ${count} notas conciliadas com sucesso!`, 5000);
+          } else {
+            createOrUpdatePill('PingouNota: Nenhuma nota correspondente no Asaas.', 5000);
+          }
         } else {
-          createOrUpdatePill('PingouNota: Nenhuma nota com Asaas encontrada.', 5000);
+          createOrUpdatePill('PingouNota: Nenhuma nota correspondente no Asaas.', 5000);
         }
       } catch (err) {
         console.error('[PingouNota] Erro durante auto-conciliação Adaflow:', err);
@@ -65,6 +82,15 @@ export default defineContentScript({
 });
 
 function createOrUpdatePill(text: string, autoDismissMs = 0): HTMLDivElement {
+  if (dismissTimer) {
+    clearTimeout(dismissTimer);
+    dismissTimer = null;
+  }
+  if (removeTimer) {
+    clearTimeout(removeTimer);
+    removeTimer = null;
+  }
+
   let pill = document.getElementById('pingounota-reconciliation-pill') as HTMLDivElement | null;
   if (!pill) {
     pill = document.createElement('div');
@@ -93,14 +119,17 @@ function createOrUpdatePill(text: string, autoDismissMs = 0): HTMLDivElement {
 
   pill.textContent = text;
   pill.style.opacity = '1';
+  pill.style.transform = 'translateY(0)';
 
   if (autoDismissMs > 0) {
-    setTimeout(() => {
+    dismissTimer = setTimeout(() => {
       if (pill) {
         pill.style.opacity = '0';
         pill.style.transform = 'translateY(-6px)';
-        setTimeout(() => {
+        removeTimer = setTimeout(() => {
           pill?.remove();
+          dismissTimer = null;
+          removeTimer = null;
         }, 300);
       }
     }, autoDismissMs);

@@ -127,6 +127,31 @@ describe('Adaflow Reconciliation Service', () => {
       const unchangedHusky = await testDb.payments.get(['husky', 'rec_03']);
       expect(unchangedHusky?.declarationState).toBe('nao_declarado');
     });
+
+    it('reconciles payments in falha_adaflow state to marcado_localmente', async () => {
+      const pFailed = makePayment({
+        recordKey: 'rec_failed',
+        sourcePaymentId: '2001',
+        declarationState: 'falha_adaflow',
+      });
+      await testDb.payments.put(pFailed);
+
+      const declarations: AdaflowReconciledDeclaration[] = [
+        {
+          asaasPaymentId: '2001',
+          adaflowNfseId: 9991,
+          date: '20/11/2026',
+        },
+      ];
+
+      const result = await reconcileAdaflowDeclarations(declarations, testDb);
+      expect(result.matchedCount).toBe(1);
+      expect(result.updatedCount).toBe(1);
+
+      const updated = await testDb.payments.get(['asaas', 'rec_failed']);
+      expect(updated?.declarationState).toBe('marcado_localmente');
+      expect(updated?.manualDeclaredAt).toContain('2026-11-20');
+    });
   });
 
   describe('fetchAdaflowDeclarations', () => {

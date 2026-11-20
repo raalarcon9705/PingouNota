@@ -48,10 +48,9 @@ export function extractAsaasPaymentId(text: string | null | undefined): string |
   if (!text) return null;
 
   const patterns = [
-    /referente à cobran[çc]a Asaas nº\s*(\d+)/i,
-    /Asaas nº\s*(\d+)/i,
-    /cobran[çc]a Asaas\s*(\d+)/i,
-    /Asaas\s*#?\s*(\d{7,12})/i,
+    /referente [aà] cobran[çc]a Asaas\s*(?:n[º°o\.]|num\.?)?\s*(\d+)/i,
+    /cobran[çc]a Asaas\s*(?:n[º°o\.]|num\.?)?\s*(\d+)/i,
+    /Asaas\s*(?:n[º°o\.]|num\.?|#)?\s*(\d+)/i,
   ];
 
   for (const regex of patterns) {

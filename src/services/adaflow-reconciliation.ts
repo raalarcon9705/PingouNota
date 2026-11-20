@@ -1,23 +1,15 @@
 import { db, type PingouNotaDB } from '../storage/database';
 import {
-  parseAdaflowInvoicesPage,
-  parseAdaflowSlideover,
-} from '../parsers/adaflow-parser';
+  fetchAdaflowDeclarations,
+  type AdaflowReconciledDeclaration,
+  type FetchAdaflowDeclarationsOptions,
+} from './adaflow-scraper';
 
-export interface AdaflowReconciledDeclaration {
-  asaasPaymentId: string;
-  adaflowNfseId: number;
-  nfseNumber?: string;
-  date?: string;
-  amountCents?: number;
-  pdfUrl?: string;
-}
-
-export interface FetchAdaflowDeclarationsOptions {
-  startUrl?: string;
-  maxPages?: number;
-  fetchFn?: typeof fetch;
-}
+export {
+  fetchAdaflowDeclarations,
+  type AdaflowReconciledDeclaration,
+  type FetchAdaflowDeclarationsOptions,
+};
 
 export interface ReconcileAdaflowResult {
   matchedCount: number;
@@ -51,105 +43,9 @@ export function normalizeDateIso(dateStr?: string | null): string {
 }
 
 /**
- * Traverses Adaflow NFSe pages, fetches slideover details for each invoice,
- * and extracts reconciled declarations with Asaas payment IDs.
- */
-export async function fetchAdaflowDeclarations(
-  options: FetchAdaflowDeclarationsOptions = {},
-): Promise<AdaflowReconciledDeclaration[]> {
-  const startUrl = options.startUrl ?? '/nfses';
-  const maxPages = options.maxPages ?? 50;
-  const fetchFn = options.fetchFn ?? globalThis.fetch;
-
-  let currentUrl: string | null = startUrl;
-  let pagesFetched = 0;
-  const visited = new Set<string>();
-  const reconciledDeclarations: AdaflowReconciledDeclaration[] = [];
-
-  while (currentUrl && pagesFetched < maxPages) {
-    if (visited.has(currentUrl)) {
-      break;
-    }
-    visited.add(currentUrl);
-    pagesFetched++;
-
-    let html: string;
-    try {
-      const response = await fetchFn(currentUrl, {
-        credentials: 'same-origin',
-      });
-      if (!response.ok) {
-        console.warn(
-          `[PingouNota] Failed to fetch Adaflow page: ${currentUrl} (HTTP ${response.status})`,
-        );
-        break;
-      }
-      html = await response.text();
-    } catch (err) {
-      console.warn(`[PingouNota] Error fetching Adaflow page: ${currentUrl}`, err);
-      break;
-    }
-
-    const { invoices, pagination } = parseAdaflowInvoicesPage(html);
-
-    for (const invoice of invoices) {
-      try {
-        const detailPath = `/nfses/${invoice.adaflowNfseId}`;
-        const detailUrl = currentUrl.startsWith('http')
-          ? new URL(detailPath, currentUrl).toString()
-          : detailPath;
-
-        const detailResponse = await fetchFn(detailUrl, {
-          headers: { 'Turbo-Frame': 'slideover_body' },
-          credentials: 'same-origin',
-        });
-
-        if (!detailResponse.ok) {
-          console.warn(
-            `[PingouNota] Failed to fetch slideover for nfse ${invoice.adaflowNfseId} (HTTP ${detailResponse.status})`,
-          );
-          continue;
-        }
-
-        const detailHtml = await detailResponse.text();
-        const slideoverDetail = parseAdaflowSlideover(detailHtml);
-
-        if (slideoverDetail.asaasPaymentId) {
-          reconciledDeclarations.push({
-            asaasPaymentId: slideoverDetail.asaasPaymentId,
-            adaflowNfseId: invoice.adaflowNfseId,
-            nfseNumber: invoice.nfseNumber || undefined,
-            date: invoice.date || undefined,
-            amountCents: invoice.amountCents,
-            pdfUrl: invoice.pdfUrl,
-          });
-        }
-      } catch (err) {
-        console.warn(
-          `[PingouNota] Unexpected error fetching slideover for nfse ${invoice.adaflowNfseId}`,
-          err,
-        );
-      }
-    }
-
-    if (pagination.nextHref) {
-      if (currentUrl.startsWith('http')) {
-        currentUrl = new URL(pagination.nextHref, currentUrl).toString();
-      } else {
-        const parsed = new URL(pagination.nextHref, 'https://app.adaflow.com');
-        currentUrl = parsed.pathname + parsed.search;
-      }
-    } else {
-      currentUrl = null;
-    }
-  }
-
-  return reconciledDeclarations;
-}
-
-/**
  * Reconciles parsed Adaflow declarations against Asaas payments in IndexedDB.
- * Updates matching undeclared payments to 'marcado_localmente' with manualDeclaredAt.
+ * Updates matching payments in 'nao_declarado' or 'falha_adaflow' state to 'marcado_localmente'
+ * with manualDeclaredAt inside an atomic Dexie transaction.
  */
 export async function reconcileAdaflowDeclarations(
   declarations: AdaflowReconciledDeclaration[],
@@ -158,27 +54,32 @@ export async function reconcileAdaflowDeclarations(
   let matchedCount = 0;
   let updatedCount = 0;
 
-  for (const decl of declarations) {
-    if (!decl.asaasPaymentId) continue;
+  await dbInstance.transaction('rw', dbInstance.payments, async () => {
+    for (const decl of declarations) {
+      if (!decl.asaasPaymentId) continue;
 
-    const payment = await dbInstance.payments
-      .where('sourcePaymentId')
-      .equals(decl.asaasPaymentId)
-      .and((p) => p.provider === 'asaas')
-      .first();
+      const payment = await dbInstance.payments
+        .where('sourcePaymentId')
+        .equals(decl.asaasPaymentId)
+        .and((p) => p.provider === 'asaas')
+        .first();
 
-    if (payment) {
-      matchedCount++;
-      if (payment.declarationState === 'nao_declarado') {
-        payment.declarationState = 'marcado_localmente';
-        payment.manualDeclaredAt = decl.date
-          ? normalizeDateIso(decl.date)
-          : new Date().toISOString();
-        await dbInstance.payments.put(payment);
-        updatedCount++;
+      if (payment) {
+        matchedCount++;
+        if (
+          payment.declarationState === 'nao_declarado' ||
+          payment.declarationState === 'falha_adaflow'
+        ) {
+          payment.declarationState = 'marcado_localmente';
+          payment.manualDeclaredAt = decl.date
+            ? normalizeDateIso(decl.date)
+            : new Date().toISOString();
+          await dbInstance.payments.put(payment);
+          updatedCount++;
+        }
       }
     }
-  }
+  });
 
   return {
     matchedCount,
