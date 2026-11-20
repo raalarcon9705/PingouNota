@@ -6,6 +6,7 @@ import {
   parseBrlAmountToCents,
   parseDateToIso,
 } from '../../src/parsers/asaas-parser';
+import { isSupportedAsaasRoute } from '../../src/services/adapters';
 
 function createDocument(html: string): Document {
   return new DOMParser().parseFromString(html, 'text/html');
@@ -263,5 +264,65 @@ describe('Asaas Payments Parser', () => {
     expect(parseDateToIso('invalid-date')).toBeNull();
     expect(parseDateToIso('')).toBeNull();
     expect(parseDateToIso(null)).toBeNull();
+  });
+
+  describe('Atlas Web Components Live Snapshot (refs/asaas/example.html)', () => {
+    const examplePath = path.resolve(__dirname, '../../refs/asaas/example.html');
+    const exampleHtml = fs.readFileSync(examplePath, 'utf-8');
+
+    it('identifies Asaas payment list route as supported', () => {
+      expect(isSupportedAsaasRoute('https://app.asaas.com/payment/list')).toBe(true);
+      expect(isSupportedAsaasRoute('/payment/list')).toBe(true);
+      expect(isSupportedAsaasRoute('/payment/index')).toBe(true);
+      expect(isSupportedAsaasRoute('/payment')).toBe(true);
+      expect(isSupportedAsaasRoute('/paymentList/loadTableContent')).toBe(false);
+    });
+
+    it('parses all 10 rows with high confidence, positive amounts, valid dates, and non-empty payer names', () => {
+      const doc = createDocument(exampleHtml);
+      const result = parseAsaasPayments(doc);
+
+      expect(result.warnings).toEqual([]);
+      expect(result.payments).toHaveLength(10);
+
+      for (const payment of result.payments) {
+        expect(payment.provider).toBe('asaas');
+        expect(payment.identityConfidence).toBe('high');
+        expect(payment.sourcePaymentId).toBeTruthy();
+        expect(payment.payerName).toBeTruthy();
+        expect(payment.payerName?.length).toBeGreaterThan(0);
+        expect(payment.amountCents).toBeGreaterThan(0);
+        expect(payment.currency).toBe('BRL');
+        expect(payment.paymentDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+        expect(['recebido', 'aguardando_recebimento']).toContain(payment.paymentState);
+      }
+
+      // Specific spot checks
+      expect(result.payments[0]).toEqual({
+        provider: 'asaas',
+        sourcePaymentId: '970720795',
+        identityConfidence: 'high',
+        payerName: 'Cliente Teste 1',
+        amountCents: 4700,
+        currency: 'BRL',
+        paymentDate: '2026-12-26',
+        sourceStatus: 'Aguardando pagamento',
+        paymentState: 'aguardando_recebimento',
+      });
+
+      expect(result.payments[1]?.payerName).toBe('Cliente Teste 2');
+      expect(result.payments[1]?.amountCents).toBe(4700);
+
+      expect(result.payments[4]?.amountCents).toBe(1190);
+      expect(result.payments[4]?.paymentState).toBe('recebido');
+      expect(result.payments[4]?.sourceStatus).toBe('Recebida em 13/11/2026');
+
+      expect(result.payments[5]?.amountCents).toBe(790);
+      expect(result.payments[5]?.payerName).toBe('Cliente Teste 4');
+
+      expect(result.payments[8]?.sourceStatus).toBe('Vencida');
+      expect(result.payments[8]?.paymentState).toBe('aguardando_recebimento');
+      expect(result.payments[8]?.amountCents).toBe(1190);
+    });
   });
 });

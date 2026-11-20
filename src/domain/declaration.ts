@@ -12,6 +12,7 @@ const ASAAS_STATUS_MAP: Record<string, PaymentState> = {
   'aguardando pagamento': 'aguardando_recebimento',
   pendente: 'aguardando_recebimento',
   vencida: 'aguardando_recebimento',
+  vencido: 'aguardando_recebimento',
   'aguardando aprovação': 'aguardando_recebimento',
   'aguardando aprovacao': 'aguardando_recebimento',
   estornado: 'revertido_ou_cancelado',
@@ -44,6 +45,10 @@ export function normalizePaymentState(
   }
 
   const normalized = sourceStatus.trim().toLowerCase();
+
+  if (normalized.startsWith('recebida em ') || normalized.startsWith('recebido em ')) {
+    return 'recebido';
+  }
 
   if (provider === 'asaas') {
     return ASAAS_STATUS_MAP[normalized] ?? 'desconhecido';

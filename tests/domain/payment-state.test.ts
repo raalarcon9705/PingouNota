@@ -223,8 +223,12 @@ describe('Payment State and Declaration Rules', () => {
     // Asaas known and unknown
     expect(normalizePaymentState('Recebido', 'asaas')).toBe('recebido');
     expect(normalizePaymentState('CONFIRMADO', 'asaas')).toBe('recebido');
+    expect(normalizePaymentState('Recebida em 13/11/2026', 'asaas')).toBe('recebido');
+    expect(normalizePaymentState('recebido em 01/01/2026', 'asaas')).toBe('recebido');
     expect(normalizePaymentState('Pendente', 'asaas')).toBe('aguardando_recebimento');
     expect(normalizePaymentState('Aguardando pagamento', 'asaas')).toBe('aguardando_recebimento');
+    expect(normalizePaymentState('Vencida', 'asaas')).toBe('aguardando_recebimento');
+    expect(normalizePaymentState('Vencido', 'asaas')).toBe('aguardando_recebimento');
     expect(normalizePaymentState('Estornado', 'asaas')).toBe('revertido_ou_cancelado');
     expect(normalizePaymentState('Em análise de risco', 'asaas')).toBe('desconhecido');
     expect(normalizePaymentState('Algo Inesperado', 'asaas')).toBe('desconhecido');

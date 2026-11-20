@@ -1,12 +1,17 @@
 import { browser } from 'wxt/browser';
-import { asaasAdapter } from '../src/services/adapters';
+import { asaasAdapter, fetchAsaasPayments } from '../src/services/adapters';
 import type { ExtensionMessage } from '../src/shared/messages';
+import type { ParseResult } from '../src/shared/observed-payment';
 
 export default defineContentScript({
   matches: [
     '*://*.asaas.com/customerPayment/index*',
     '*://*.asaas.com/customerPayment/list*',
     '*://*.asaas.com/app/cobranzas*',
+    '*://*.asaas.com/payment/list*',
+    '*://*.asaas.com/payment/index*',
+    '*://*.asaas.com/payment',
+    '*://*.asaas.com/payment?*',
   ],
   runAt: 'document_idle',
   async main() {
@@ -46,7 +51,19 @@ export default defineContentScript({
       } | null;
 
       const scanId = ack?.scanId || crypto.randomUUID();
-      const result = asaasAdapter.parse(document);
+
+      let result: ParseResult;
+      let usedFetch = false;
+
+      try {
+        // Primary: authenticated fetch requesting all pages
+        result = await fetchAsaasPayments(1, 50);
+        usedFetch = true;
+      } catch (fetchErr) {
+        // Fallback: DOM scanning
+        console.warn?.('[PingouNota] Authenticated fetch failed, falling back to DOM parsing:', fetchErr);
+        result = asaasAdapter.parse(document);
+      }
 
       const observedMsg: ExtensionMessage = {
         type: 'PAYMENTS_OBSERVED',
@@ -57,12 +74,15 @@ export default defineContentScript({
 
       await browser.runtime.sendMessage(observedMsg).catch(() => {});
 
-      // Continue to next page if supported and user hasn't interacted
-      const pagination = asaasAdapter.nextPage(document);
-      if (pagination.kind === 'next' && !userInteracted) {
-        const nextHref = pagination.href;
-        if (asaasAdapter.isSupportedRoute(nextHref)) {
-          window.location.href = nextHref;
+      // When fetch is used, all pages are collected in-memory (pagination is 'end').
+      // Only execute window.location.href if fallback DOM scanning was used and returned an actual HTML page nextHref.
+      if (!usedFetch) {
+        const pagination = asaasAdapter.nextPage(document);
+        if (pagination.kind === 'next' && !userInteracted) {
+          const nextHref = pagination.href;
+          if (asaasAdapter.isSupportedRoute(nextHref)) {
+            window.location.href = nextHref;
+          }
         }
       }
     } catch (err) {
