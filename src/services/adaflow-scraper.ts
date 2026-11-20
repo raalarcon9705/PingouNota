@@ -12,6 +12,7 @@ export interface AdaflowReconciledDeclaration {
   amountCents?: number;
   pdfUrl?: string;
   description?: string;
+  takerName?: string;
 }
 
 export interface AdaflowImportedTaker {
@@ -37,6 +38,11 @@ export interface FetchAdaflowDeclarationsOptions {
   startUrl?: string;
   maxPages?: number;
   fetchFn?: typeof fetch;
+  onProgress?: (info: {
+    currentPage: number;
+    totalPages?: number;
+    message?: string;
+  }) => void | Promise<void>;
 }
 
 export type FetchAdaflowDeclarationsResult = AdaflowReconciledDeclaration[] & {
@@ -45,6 +51,16 @@ export type FetchAdaflowDeclarationsResult = AdaflowReconciledDeclaration[] & {
   totalInvoicesFound: number;
   takers: AdaflowImportedTaker[];
   templates: AdaflowImportedTemplate[];
+  unmatchedNotes: Array<{
+    adaflowNfseId: number;
+    nfseNumber?: string;
+    takerName?: string;
+    date?: string;
+    asaasPaymentId?: string | null;
+    description?: string;
+    requiresManualAction: boolean;
+    reason?: string;
+  }>;
 };
 
 /**
@@ -80,9 +96,11 @@ export async function fetchAdaflowDeclarations(
     adaflowNfseId: number;
     nfseNumber?: string;
     takerName?: string;
+    date?: string;
     asaasPaymentId?: string | null;
     description?: string;
     requiresManualAction: boolean;
+    reason?: string;
   }> = [];
 
   let pagesFetched = 0;
@@ -115,6 +133,23 @@ export async function fetchAdaflowDeclarations(
     const { invoices, pagination } = parseAdaflowInvoicesPage(html);
     const currentPage = pagination.currentPage || pagesFetched;
     const nextHref = pagination.nextHref;
+
+    const totalPages =
+      pagination.pageHrefs.length > 0
+        ? Math.max(
+            currentPage,
+            ...pagination.pageHrefs.map((h) => {
+              const match = h.match(/page=(\d+)/);
+              return match && match[1] ? parseInt(match[1], 10) : 0;
+            }),
+          )
+        : undefined;
+
+    await options.onProgress?.({
+      currentPage,
+      totalPages,
+      message: `Escaneando página ${currentPage} de notas na Adaflow...`,
+    });
 
     console.info(
       `[PingouNota:Adaflow] 📄 Página ${currentPage}: ${invoices.length} notas encontradas. Próxima: ${nextHref || 'fim'}`,
@@ -231,10 +266,12 @@ export async function fetchAdaflowDeclarations(
         allScannedNotes.push({
           adaflowNfseId: invoice.adaflowNfseId,
           nfseNumber: invoice.nfseNumber || undefined,
-          takerName: invoice.takerName || undefined,
+          takerName: takerName || invoice.takerName || undefined,
+          date: invoice.date || undefined,
           asaasPaymentId: slideoverDetail.asaasPaymentId,
           description: slideoverDetail.description,
           requiresManualAction: !hasAsaasId,
+          reason: !hasAsaasId ? 'Cobrança Asaas não encontrada na base local de pagamentos.' : undefined,
         });
 
         if (slideoverDetail.asaasPaymentId) {
@@ -303,6 +340,7 @@ export async function fetchAdaflowDeclarations(
 
   const takers = Array.from(uniqueTakersMap.values());
   const templates = Array.from(uniqueTemplatesMap.values());
+  const unmatchedNotes = allScannedNotes.filter((n) => n.requiresManualAction);
 
   const result = Object.assign(reconciledDeclarations, {
     declarations: reconciledDeclarations,
@@ -310,6 +348,7 @@ export async function fetchAdaflowDeclarations(
     totalInvoicesFound: allScannedNotes.length,
     takers,
     templates,
+    unmatchedNotes,
   });
 
   return result as FetchAdaflowDeclarationsResult;

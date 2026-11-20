@@ -4,6 +4,10 @@ import type { Payment } from '../src/domain/payment';
 import {
   fetchAdaflowDeclarations,
   getLastReconciliationAudit,
+  getAdaflowSyncState,
+  setAdaflowSyncState,
+  _resetSyncStateForTesting,
+  ADAFLOW_SYNC_STATE_STORAGE_KEY,
   importAdaflowTakers,
   normalizeDateIso,
   reconcileAdaflowDeclarations,
@@ -230,6 +234,174 @@ describe('Adaflow Reconciliation Service', () => {
       const updated = await testDb.payments.get(['asaas', 'rec_failed']);
       expect(updated?.declarationState).toBe('marcado_localmente');
       expect(updated?.manualDeclaredAt).toContain('2026-11-20');
+    });
+
+    it('records unmatched notes (like Notas 66 e 67) requiring manual action in audit record', async () => {
+      const pMatched = makePayment({
+        recordKey: 'rec_matched',
+        sourcePaymentId: '3001',
+        declarationState: 'nao_declarado',
+      });
+      await testDb.payments.put(pMatched);
+
+      const declarations: AdaflowReconciledDeclaration[] = [
+        {
+          asaasPaymentId: '3001',
+          adaflowNfseId: 1065,
+          nfseNumber: '65',
+          date: '10/11/2026',
+        },
+      ];
+
+      const unmatchedNotes = [
+        {
+          adaflowNfseId: 1066,
+          nfseNumber: '66',
+          takerName: 'Empresa Alpha Ltda',
+          date: '11/11/2026',
+          asaasPaymentId: '891557',
+          description: 'Desenvolvimento de software referente a cobranca Asaas 891557',
+          requiresManualAction: true,
+          reason: 'Cobrança Asaas não encontrada na base local de pagamentos.',
+        },
+        {
+          adaflowNfseId: 1067,
+          nfseNumber: '67',
+          takerName: 'Empresa Beta S/A',
+          date: '12/11/2026',
+          asaasPaymentId: null,
+          description: 'Consultoria e mentoria avulsa sem ID',
+          requiresManualAction: true,
+        },
+      ];
+
+      const result = await reconcileAdaflowDeclarations(
+        declarations,
+        testDb,
+        undefined,
+        undefined,
+        unmatchedNotes,
+      );
+
+      expect(result.matchedCount).toBe(1);
+      expect(result.updatedCount).toBe(1);
+      expect(result.declarationsFound).toBe(3);
+
+      const audit = await getLastReconciliationAudit();
+      expect(audit).not.toBeNull();
+      expect(audit?.unmatchedCount).toBe(2);
+      expect(audit?.details).toHaveLength(3);
+
+      const note66 = audit?.details.find((d) => d.adaflowNfseId === 1066);
+      expect(note66).toBeDefined();
+      expect(note66?.asaasPaymentId).toBe('891557');
+      expect(note66?.nfseNumber).toBe('66');
+      expect(note66?.takerName).toBe('Empresa Alpha Ltda');
+      expect(note66?.status).toBe('not_found');
+      expect(note66?.requiresManualAction).toBe(true);
+      expect(note66?.reason).toBe(
+        'Cobrança Asaas não encontrada na base local de pagamentos.',
+      );
+
+      const note67 = audit?.details.find((d) => d.adaflowNfseId === 1067);
+      expect(note67).toBeDefined();
+      expect(note67?.asaasPaymentId).toBe('');
+      expect(note67?.nfseNumber).toBe('67');
+      expect(note67?.takerName).toBe('Empresa Beta S/A');
+      expect(note67?.status).toBe('not_found');
+      expect(note67?.requiresManualAction).toBe(true);
+    });
+  });
+
+  describe('Adaflow Sync State Tracking', () => {
+    beforeEach(() => {
+      _resetSyncStateForTesting();
+    });
+
+    it('returns null when no sync state has been recorded', async () => {
+      const state = await getAdaflowSyncState();
+      expect(state).toBeNull();
+    });
+
+    it('persists and retrieves active sync state with pagination progress', async () => {
+      await setAdaflowSyncState({
+        isSyncing: true,
+        progressMessage: 'Escaneando página 3 de notas na Adaflow...',
+        currentPage: 3,
+        totalPages: 5,
+        updatedAt: '2026-11-20T18:00:00.000Z',
+      });
+
+      const state = await getAdaflowSyncState();
+      expect(state).toEqual({
+        isSyncing: true,
+        progressMessage: 'Escaneando página 3 de notas na Adaflow...',
+        currentPage: 3,
+        totalPages: 5,
+        updatedAt: '2026-11-20T18:00:00.000Z',
+      });
+    });
+
+    it('updates to idle state when sync finishes', async () => {
+      await setAdaflowSyncState({
+        isSyncing: true,
+        progressMessage: 'Iniciando...',
+        updatedAt: '2026-11-20T18:00:00.000Z',
+      });
+
+      await setAdaflowSyncState({
+        isSyncing: false,
+        progressMessage: undefined,
+        updatedAt: '2026-11-20T18:01:00.000Z',
+      });
+
+      const state = await getAdaflowSyncState();
+      expect(state?.isSyncing).toBe(false);
+      expect(state?.progressMessage).toBeUndefined();
+    });
+
+    it('clears sync state on _resetSyncStateForTesting', async () => {
+      await setAdaflowSyncState({
+        isSyncing: true,
+        updatedAt: '2026-11-20T18:00:00.000Z',
+      });
+      _resetSyncStateForTesting();
+      expect(await getAdaflowSyncState()).toBeNull();
+    });
+  });
+
+  describe('Extension Messages Schema', () => {
+    it('validates ADAFLOW_RECONCILIATION_COMPLETED message', () => {
+      const validMsg = {
+        type: 'ADAFLOW_RECONCILIATION_COMPLETED',
+        matchedCount: 3,
+        updatedCount: 2,
+        declarationsFound: 5,
+      };
+      const parsed = extensionMessageSchema.safeParse(validMsg);
+      expect(parsed.success).toBe(true);
+    });
+
+    it('validates ADAFLOW_RECONCILIATION_OBSERVED with unmatchedNotes', () => {
+      const validMsg = {
+        type: 'ADAFLOW_RECONCILIATION_OBSERVED',
+        declarations: [
+          {
+            asaasPaymentId: '1001',
+            adaflowNfseId: 10,
+          },
+        ],
+        unmatchedNotes: [
+          {
+            adaflowNfseId: 11,
+            nfseNumber: '66',
+            takerName: 'Empresa Teste',
+            requiresManualAction: true,
+          },
+        ],
+      };
+      const parsed = extensionMessageSchema.safeParse(validMsg);
+      expect(parsed.success).toBe(true);
     });
   });
 

@@ -160,7 +160,11 @@ export const App: React.FC = () => {
       if (!message || typeof message !== 'object') return;
       const msg = message as { type?: string; progress?: ScanProgress };
 
-      if (msg.type === 'PAYMENTS_OBSERVED' || msg.type === 'ISSUE_QUEUE_PROGRESS') {
+      if (
+        msg.type === 'PAYMENTS_OBSERVED' ||
+        msg.type === 'ISSUE_QUEUE_PROGRESS' ||
+        msg.type === 'ADAFLOW_RECONCILIATION_COMPLETED'
+      ) {
         loadData();
       }
 

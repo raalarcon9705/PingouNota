@@ -6,7 +6,10 @@ import {
   updateActionBadge,
 } from '../src/services/scan-coordinator';
 import { emissionQueue } from '../src/services/adaflow/emission-queue';
-import { reconcileAdaflowDeclarations } from '../src/services/adaflow-reconciliation';
+import {
+  reconcileAdaflowDeclarations,
+  setAdaflowSyncState,
+} from '../src/services/adaflow-reconciliation';
 
 export default defineBackground(() => {
   const setupStorageSecurity = async () => {
@@ -172,13 +175,32 @@ export default defineBackground(() => {
           undefined,
           validMessage.takers,
           validMessage.templates,
+          validMessage.unmatchedNotes,
         )
-          .then(async ({ matchedCount, updatedCount }) => {
+          .then(async ({ matchedCount, updatedCount, declarationsFound }) => {
+            await setAdaflowSyncState({
+              isSyncing: false,
+              updatedAt: new Date().toISOString(),
+            });
             await updateActionBadge();
+            try {
+              await browser.runtime.sendMessage({
+                type: 'ADAFLOW_RECONCILIATION_COMPLETED',
+                matchedCount,
+                updatedCount,
+                declarationsFound,
+              });
+            } catch {
+              // Ignore if no active listeners
+            }
             sendResponse({ success: true, matchedCount, updatedCount });
           })
-          .catch((error) => {
+          .catch(async (error) => {
             console.error('[PingouNota] Error during Adaflow reconciliation:', error);
+            await setAdaflowSyncState({
+              isSyncing: false,
+              updatedAt: new Date().toISOString(),
+            });
             sendResponse({ success: false, error: String(error) });
           });
 

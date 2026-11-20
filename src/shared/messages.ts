@@ -2,6 +2,12 @@ import { z } from 'zod';
 import type { PaymentProvider } from '../domain/payment';
 import type { ParseResult } from './observed-payment';
 import type { AdaflowImportedTaker, AdaflowImportedTemplate } from '../services/adaflow-scraper';
+import {
+  ADAFLOW_SYNC_STATE_STORAGE_KEY,
+  type AdaflowSyncState,
+} from '../services/adaflow-reconciliation';
+
+export { ADAFLOW_SYNC_STATE_STORAGE_KEY, type AdaflowSyncState };
 
 export interface ScanProgress {
   scanId: string;
@@ -21,6 +27,12 @@ export type ExtensionMessage =
   | { type: 'ISSUE_QUEUE_START'; operationIds: string[] }
   | { type: 'ISSUE_QUEUE_PROGRESS'; operationIds: string[] }
   | {
+      type: 'ADAFLOW_RECONCILIATION_COMPLETED';
+      matchedCount?: number;
+      updatedCount?: number;
+      declarationsFound?: number;
+    }
+  | {
       type: 'ADAFLOW_RECONCILIATION_OBSERVED';
       declarations: Array<{
         asaasPaymentId: string;
@@ -30,11 +42,22 @@ export type ExtensionMessage =
         amountCents?: number;
         pdfUrl?: string;
         description?: string;
+        takerName?: string;
       }>;
       pagesScanned?: number;
       totalInvoicesFound?: number;
       takers?: AdaflowImportedTaker[];
       templates?: AdaflowImportedTemplate[];
+      unmatchedNotes?: Array<{
+        adaflowNfseId: number;
+        nfseNumber?: string;
+        takerName?: string;
+        date?: string;
+        asaasPaymentId?: string | null;
+        description?: string;
+        requiresManualAction?: boolean;
+        reason?: string;
+      }>;
     };
 
 export type AdaflowReconciliationObservedMessage = Extract<
@@ -107,6 +130,12 @@ export const extensionMessageSchema = z.discriminatedUnion('type', [
     operationIds: z.array(z.string()),
   }),
   z.object({
+    type: z.literal('ADAFLOW_RECONCILIATION_COMPLETED'),
+    matchedCount: z.number().optional(),
+    updatedCount: z.number().optional(),
+    declarationsFound: z.number().optional(),
+  }),
+  z.object({
     type: z.literal('ADAFLOW_RECONCILIATION_OBSERVED'),
     declarations: z.array(
       z.object({
@@ -117,6 +146,7 @@ export const extensionMessageSchema = z.discriminatedUnion('type', [
         amountCents: z.number().optional(),
         pdfUrl: z.string().optional(),
         description: z.string().optional(),
+        takerName: z.string().optional(),
       }),
     ),
     pagesScanned: z.number().optional(),
@@ -143,6 +173,20 @@ export const extensionMessageSchema = z.discriminatedUnion('type', [
           cnae: z.string().optional(),
           withholdTaxes: z.boolean().optional(),
           discoveredFromNfse: z.string().optional(),
+        }),
+      )
+      .optional(),
+    unmatchedNotes: z
+      .array(
+        z.object({
+          adaflowNfseId: z.number(),
+          nfseNumber: z.string().optional(),
+          takerName: z.string().optional(),
+          date: z.string().optional(),
+          asaasPaymentId: z.string().nullable().optional(),
+          description: z.string().optional(),
+          requiresManualAction: z.boolean().optional(),
+          reason: z.string().optional(),
         }),
       )
       .optional(),

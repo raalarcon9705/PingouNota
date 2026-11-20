@@ -1,5 +1,6 @@
 import { browser } from 'wxt/browser';
 import { fetchAdaflowDeclarations } from '../src/services/adaflow-scraper';
+import { setAdaflowSyncState } from '../src/services/adaflow-reconciliation';
 import type { ExtensionMessage } from '../src/shared/messages';
 
 declare global {
@@ -37,15 +38,31 @@ export default defineContentScript({
 
       let pill: HTMLDivElement | null = null;
       try {
+        await setAdaflowSyncState({
+          isSyncing: true,
+          progressMessage: 'Sincronizando notas fiscais emitidas na Adaflow...',
+          updatedAt: new Date().toISOString(),
+        });
+
         pill = createOrUpdatePill('PingouNota: Sincronizando notas fiscais emitidas...');
 
-        const { declarations, pagesScanned, totalInvoicesFound, takers, templates } =
-          await fetchAdaflowDeclarations();
+        const { declarations, pagesScanned, totalInvoicesFound, takers, templates, unmatchedNotes } =
+          await fetchAdaflowDeclarations({
+            onProgress: async ({ currentPage }) => {
+              await setAdaflowSyncState({
+                isSyncing: true,
+                progressMessage: `Escaneando página ${currentPage} de notas na Adaflow...`,
+                currentPage,
+                updatedAt: new Date().toISOString(),
+              });
+            },
+          });
 
         if (
           declarations.length > 0 ||
           (takers && takers.length > 0) ||
-          (templates && templates.length > 0)
+          (templates && templates.length > 0) ||
+          (unmatchedNotes && unmatchedNotes.length > 0)
         ) {
           const message: ExtensionMessage = {
             type: 'ADAFLOW_RECONCILIATION_OBSERVED',
@@ -54,6 +71,7 @@ export default defineContentScript({
             totalInvoicesFound,
             takers,
             templates,
+            unmatchedNotes,
           };
 
           const response = (await browser.runtime.sendMessage(message)) as {
@@ -80,6 +98,11 @@ export default defineContentScript({
         }
       } finally {
         window.__pingounota_adaflow_reconciling = false;
+        await setAdaflowSyncState({
+          isSyncing: false,
+          progressMessage: undefined,
+          updatedAt: new Date().toISOString(),
+        });
       }
     };
 

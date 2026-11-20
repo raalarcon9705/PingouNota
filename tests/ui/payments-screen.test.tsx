@@ -712,4 +712,73 @@ describe('PaymentsScreen & UI Components', () => {
       expect(isSupportedPortalUrl(undefined)).toBe(false);
     });
   });
+
+  describe('Adaflow Real-time Sync & Reconciliation in PaymentsScreen', () => {
+    it('renders active sync indicator when syncState indicates isSyncing', () => {
+      render(
+        <PaymentsScreen
+          payments={syntheticPayments}
+          syncState={{
+            isSyncing: true,
+            progressMessage: 'Escaneando página 1 de notas na Adaflow...',
+            currentPage: 1,
+            updatedAt: '2026-11-20T18:00:00.000Z',
+          }}
+        />,
+      );
+
+      expect(screen.getByTestId('reconciliation-sync-indicator')).toBeInTheDocument();
+      expect(
+        screen.getByText(/Sincronizando Adaflow: Escaneando página 1 de notas na Adaflow.../),
+      ).toBeInTheDocument();
+    });
+
+    it('renders reconciliation audit card with unmatched warning alert in PaymentsScreen', () => {
+      const now = new Date();
+      now.setHours(15, 30, 0, 0);
+
+      render(
+        <PaymentsScreen
+          payments={syntheticPayments}
+          audit={{
+            timestamp: now.toISOString(),
+            declarationsFound: 2,
+            matchedCount: 1,
+            updatedCount: 1,
+            alreadyDeclaredCount: 0,
+            unmatchedCount: 1,
+            details: [
+              {
+                asaasPaymentId: 'pay_1',
+                nfseNumber: '65',
+                adaflowNfseId: 1065,
+                status: 'updated',
+                requiresManualAction: false,
+              },
+              {
+                asaasPaymentId: '891557',
+                nfseNumber: '66',
+                adaflowNfseId: 1066,
+                date: '11/11/2026',
+                takerName: 'Alpha Tech',
+                description: 'Consultoria dev Asaas 891557',
+                status: 'not_found',
+                requiresManualAction: true,
+              },
+            ],
+          }}
+        />,
+      );
+
+      expect(screen.getByTestId('reconciliation-summary-card')).toBeInTheDocument();
+      expect(screen.getByTestId('stat-matched')).toHaveTextContent('✅ 1 correspondências');
+      expect(screen.getByTestId('audit-warning-box')).toBeInTheDocument();
+
+      // Expand unmatched details
+      fireEvent.click(screen.getByTestId('toggle-unmatched-details-btn'));
+      expect(screen.getByTestId('unmatched-item-1066')).toBeInTheDocument();
+      expect(screen.getByText('Tomador: Alpha Tech')).toBeInTheDocument();
+      expect(screen.getByText('891557')).toBeInTheDocument();
+    });
+  });
 });

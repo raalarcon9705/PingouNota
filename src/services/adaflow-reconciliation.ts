@@ -25,6 +25,15 @@ export {
 export const RECONCILIATION_AUDIT_STORAGE_KEY = 'last_reconciliation_audit';
 export const PROPOSED_TAKERS_STORAGE_KEY = 'adaflow_proposed_takers';
 export const PROPOSED_TEMPLATES_STORAGE_KEY = 'adaflow_proposed_templates';
+export const ADAFLOW_SYNC_STATE_STORAGE_KEY = 'adaflow_sync_state';
+
+export interface AdaflowSyncState {
+  isSyncing: boolean;
+  progressMessage?: string;
+  currentPage?: number;
+  totalPages?: number;
+  updatedAt: string;
+}
 
 export interface ProposedTaker {
   id: string;
@@ -63,6 +72,8 @@ export interface ReconciliationAuditRecord {
     description?: string;
     status: 'updated' | 'already_declared' | 'not_found';
     requiresManualAction?: boolean;
+    takerName?: string;
+    reason?: string;
   }>;
 }
 
@@ -76,6 +87,74 @@ export interface ReconcileAdaflowResult {
 let memoryAuditForTesting: ReconciliationAuditRecord | null = null;
 let memoryProposedTakersForTesting: ProposedTaker[] = [];
 let memoryProposedTemplatesForTesting: ProposedTemplate[] = [];
+let memorySyncStateForTesting: AdaflowSyncState | null = null;
+
+/**
+ * Recupera o estado atual de sincronização da Adaflow do storage.
+ */
+export async function getAdaflowSyncState(): Promise<AdaflowSyncState | null> {
+  try {
+    if (typeof browser !== 'undefined' && browser?.storage?.local?.get) {
+      const result = await browser.storage.local.get(ADAFLOW_SYNC_STATE_STORAGE_KEY);
+      const state = result?.[ADAFLOW_SYNC_STATE_STORAGE_KEY];
+      if (state) return state as AdaflowSyncState;
+      return null;
+    }
+
+    if (typeof chrome !== 'undefined' && chrome?.storage?.local?.get) {
+      return new Promise<AdaflowSyncState | null>((resolve) => {
+        chrome.storage.local.get([ADAFLOW_SYNC_STATE_STORAGE_KEY], (res: Record<string, unknown>) => {
+          const state = res?.[ADAFLOW_SYNC_STATE_STORAGE_KEY];
+          if (state) {
+            resolve(state as AdaflowSyncState);
+          } else {
+            resolve(null);
+          }
+        });
+      });
+    }
+  } catch (error) {
+    console.warn('[PingouNota:Reconciliação] Falha ao recuperar sync state de storage.local:', error);
+  }
+
+  return memorySyncStateForTesting;
+}
+
+/**
+ * Salva o estado atual de sincronização da Adaflow no storage.
+ */
+export async function setAdaflowSyncState(state: AdaflowSyncState): Promise<void> {
+  memorySyncStateForTesting = state;
+
+  try {
+    if (typeof browser !== 'undefined' && browser?.storage?.local?.set) {
+      await browser.storage.local.set({ [ADAFLOW_SYNC_STATE_STORAGE_KEY]: state });
+      return;
+    }
+
+    if (typeof chrome !== 'undefined' && chrome?.storage?.local?.set) {
+      await new Promise<void>((resolve, reject) => {
+        chrome.storage.local.set({ [ADAFLOW_SYNC_STATE_STORAGE_KEY]: state }, () => {
+          if (chrome.runtime?.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else {
+            resolve();
+          }
+        });
+      });
+      return;
+    }
+  } catch (error) {
+    console.warn('[PingouNota:Reconciliação] Falha ao salvar sync state em storage.local:', error);
+  }
+}
+
+/**
+ * Helper interno para reset do sync state em testes.
+ */
+export function _resetSyncStateForTesting(): void {
+  memorySyncStateForTesting = null;
+}
 
 /**
  * Recupera o último registro de auditoria de conciliação do storage.
@@ -142,6 +221,7 @@ export async function saveLastReconciliationAudit(audit: ReconciliationAuditReco
  */
 export function _resetMemoryAuditForTesting(): void {
   memoryAuditForTesting = null;
+  memorySyncStateForTesting = null;
 }
 
 export function _resetProposedForTesting(): void {
@@ -429,6 +509,16 @@ export async function reconcileAdaflowDeclarations(
   dbInstance: PingouNotaDB = db,
   takers?: AdaflowImportedTaker[],
   templates?: AdaflowImportedTemplate[],
+  unmatchedNotes?: Array<{
+    adaflowNfseId: number;
+    nfseNumber?: string;
+    takerName?: string;
+    date?: string;
+    asaasPaymentId?: string | null;
+    description?: string;
+    requiresManualAction?: boolean;
+    reason?: string;
+  }>,
 ): Promise<ReconcileAdaflowResult> {
   // Propose takers rather than silent auto-insertion
   if (takers && takers.length > 0) {
@@ -588,7 +678,7 @@ export async function reconcileAdaflowDeclarations(
           console.info(
             `[PingouNota:Reconciliação] ✅ Cobrança Asaas ${decl.asaasPaymentId}: marcada como DECLARADA (Nota ${decl.nfseNumber || decl.adaflowNfseId}, Emissão: ${decl.date || 'N/A'})`,
           );
-          details.push({
+          const detailItem: ReconciliationAuditRecord['details'][number] = {
             asaasPaymentId: decl.asaasPaymentId,
             nfseNumber: decl.nfseNumber,
             adaflowNfseId: decl.adaflowNfseId,
@@ -596,13 +686,15 @@ export async function reconcileAdaflowDeclarations(
             description: decl.description,
             status: 'updated',
             requiresManualAction: false,
-          });
+          };
+          if (decl.takerName) detailItem.takerName = decl.takerName;
+          details.push(detailItem);
         } else {
           alreadyDeclaredCount++;
           console.info(
             `[PingouNota:Reconciliação] ℹ️ Cobrança Asaas ${decl.asaasPaymentId}: já estava declarada anteriormente.`,
           );
-          details.push({
+          const detailItem: ReconciliationAuditRecord['details'][number] = {
             asaasPaymentId: decl.asaasPaymentId,
             nfseNumber: decl.nfseNumber,
             adaflowNfseId: decl.adaflowNfseId,
@@ -610,14 +702,16 @@ export async function reconcileAdaflowDeclarations(
             description: decl.description,
             status: 'already_declared',
             requiresManualAction: false,
-          });
+          };
+          if (decl.takerName) detailItem.takerName = decl.takerName;
+          details.push(detailItem);
         }
       } else {
         unmatchedCount++;
         console.warn(
           `[PingouNota:Reconciliação] ⚠️ [Atenção: Ação Manual Requerida] Cobrança Asaas ${decl.asaasPaymentId} (Nota ${decl.nfseNumber || decl.adaflowNfseId}): não encontrada na base local de pagamentos. Requer conferência manual.`,
         );
-        details.push({
+        const detailItem: ReconciliationAuditRecord['details'][number] = {
           asaasPaymentId: decl.asaasPaymentId,
           nfseNumber: decl.nfseNumber,
           adaflowNfseId: decl.adaflowNfseId,
@@ -625,14 +719,39 @@ export async function reconcileAdaflowDeclarations(
           description: decl.description,
           status: 'not_found',
           requiresManualAction: true,
-        });
+        };
+        if (decl.takerName) detailItem.takerName = decl.takerName;
+        details.push(detailItem);
+      }
+    }
+
+    if (unmatchedNotes && unmatchedNotes.length > 0) {
+      for (const note of unmatchedNotes) {
+        unmatchedCount++;
+        console.warn(
+          `[PingouNota:Reconciliação] ⚠️ [Atenção: Ação Manual Requerida] Nota ${note.nfseNumber || note.adaflowNfseId} (${note.takerName || 'sem tomador'}): sem referência Asaas identificada na descrição. Requer conferência manual.`,
+        );
+        const detailItem: ReconciliationAuditRecord['details'][number] = {
+          asaasPaymentId: note.asaasPaymentId || '',
+          nfseNumber: note.nfseNumber,
+          adaflowNfseId: note.adaflowNfseId,
+          date: note.date,
+          description: note.description,
+          status: 'not_found',
+          requiresManualAction: true,
+          reason: note.reason || 'Cobrança Asaas não encontrada na base local de pagamentos.',
+        };
+        if (note.takerName) detailItem.takerName = note.takerName;
+        details.push(detailItem);
       }
     }
   });
 
+  const totalDeclarationsFound = declarations.length + (unmatchedNotes?.length ?? 0);
+
   const audit: ReconciliationAuditRecord = {
     timestamp: new Date().toISOString(),
-    declarationsFound: declarations.length,
+    declarationsFound: totalDeclarationsFound,
     matchedCount,
     updatedCount,
     alreadyDeclaredCount,
@@ -649,7 +768,7 @@ export async function reconcileAdaflowDeclarations(
   return {
     matchedCount,
     updatedCount,
-    declarationsFound: declarations.length,
+    declarationsFound: totalDeclarationsFound,
     audit,
   };
 }

@@ -1,6 +1,15 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { browser } from 'wxt/browser';
 import type { Payment } from '../../../src/domain/payment';
 import type { ScanStatus as ScanStatusType } from '../../../src/services/scan-coordinator';
+import {
+  getLastReconciliationAudit,
+  getAdaflowSyncState,
+  RECONCILIATION_AUDIT_STORAGE_KEY,
+  ADAFLOW_SYNC_STATE_STORAGE_KEY,
+  type AdaflowSyncState,
+  type ReconciliationAuditRecord,
+} from '../../../src/services/adaflow-reconciliation';
 import { listPayments } from '../../../src/storage/payment-repository';
 import PaymentFilters, {
   filterPayments,
@@ -12,6 +21,7 @@ import PaymentRow, {
   getSelectionEligibility,
 } from '../components/PaymentRow';
 import ScanStatus, { type PortalSourceState } from '../components/ScanStatus';
+import ReconciliationCard from '../components/ReconciliationCard';
 export type { PortalSourceState };
 
 export interface PaymentSummary {
@@ -93,6 +103,8 @@ export interface PaymentsScreenProps {
   onLocalMark?: (selected: Payment[]) => void;
   onIssueAdaflow?: (selected: Payment[]) => void;
   onRefresh?: () => void;
+  syncState?: AdaflowSyncState | null;
+  audit?: ReconciliationAuditRecord | null;
 }
 
 export const PaymentsScreen: React.FC<PaymentsScreenProps> = ({
@@ -107,11 +119,15 @@ export const PaymentsScreen: React.FC<PaymentsScreenProps> = ({
   onLocalMark,
   onIssueAdaflow,
   onRefresh,
+  syncState: controlledSyncState,
+  audit: controlledAudit,
 }) => {
   const [internalPayments, setInternalPayments] = useState<Payment[]>([]);
   const [internalLoading, setInternalLoading] = useState<boolean>(
     controlledPayments === undefined,
   );
+  const [internalAudit, setInternalAudit] = useState<ReconciliationAuditRecord | null>(null);
+  const [internalSyncState, setInternalSyncState] = useState<AdaflowSyncState | null>(null);
   const [filters, setFilters] = useState<FilterState>(initialFilterState);
   const [selectedRecordKeys, setSelectedRecordKeys] = useState<Set<string>>(new Set());
 
@@ -121,6 +137,69 @@ export const PaymentsScreen: React.FC<PaymentsScreenProps> = ({
   const rawPayments = isControlled ? controlledPayments : internalPayments;
   const isLoading =
     controlledLoading !== undefined ? controlledLoading : internalLoading;
+
+  const isControlledAudit = controlledAudit !== undefined;
+  const audit = isControlledAudit ? controlledAudit : internalAudit;
+
+  const isControlledSyncState = controlledSyncState !== undefined;
+  const syncState = isControlledSyncState ? controlledSyncState : internalSyncState;
+
+  const loadReconciliationData = useCallback(async () => {
+    try {
+      const [lastAudit, currentSyncState] = await Promise.all([
+        getLastReconciliationAudit(),
+        getAdaflowSyncState(),
+      ]);
+      if (!isControlledAudit) {
+        setInternalAudit(lastAudit);
+      }
+      if (!isControlledSyncState) {
+        setInternalSyncState(currentSyncState);
+      }
+    } catch (e) {
+      console.warn('[PingouNota] Erro ao carregar dados de conciliação:', e);
+    }
+  }, [isControlledAudit, isControlledSyncState]);
+
+  useEffect(() => {
+    loadReconciliationData();
+
+    const onStorageChanged = (changes: Record<string, unknown>) => {
+      if (
+        changes[RECONCILIATION_AUDIT_STORAGE_KEY] ||
+        changes[ADAFLOW_SYNC_STATE_STORAGE_KEY]
+      ) {
+        loadReconciliationData();
+      }
+    };
+
+    const onRuntimeMessage = (message: unknown) => {
+      if (!message || typeof message !== 'object') return;
+      const msg = message as { type?: string };
+      if (
+        msg.type === 'ADAFLOW_RECONCILIATION_COMPLETED' ||
+        msg.type === 'ADAFLOW_RECONCILIATION_OBSERVED'
+      ) {
+        loadReconciliationData();
+      }
+    };
+
+    try {
+      browser?.storage?.onChanged?.addListener?.(onStorageChanged);
+      browser?.runtime?.onMessage?.addListener?.(onRuntimeMessage);
+    } catch {
+      // Ignored in test / non-extension environments
+    }
+
+    return () => {
+      try {
+        browser?.storage?.onChanged?.removeListener?.(onStorageChanged);
+        browser?.runtime?.onMessage?.removeListener?.(onRuntimeMessage);
+      } catch {
+        // Ignored
+      }
+    };
+  }, [loadReconciliationData]);
 
   useEffect(() => {
     if (!isControlled) {
@@ -220,6 +299,15 @@ export const PaymentsScreen: React.FC<PaymentsScreenProps> = ({
         sourceState={sourceState === 'unsupported-origin' ? undefined : sourceState}
         sourceStateMessage={sourceStateMessage}
         hasLocalPayments={rawPayments.length > 0}
+      />
+
+      <ReconciliationCard
+        syncState={syncState}
+        audit={audit}
+        onRefresh={() => {
+          loadReconciliationData();
+          onRefresh?.();
+        }}
       />
 
       {/* Summary Cards */}
