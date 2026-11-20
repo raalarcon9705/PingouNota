@@ -1,5 +1,5 @@
 import { browser } from 'wxt/browser';
-import { asaasAdapter } from '../src/services/scan-coordinator';
+import { asaasAdapter } from '../src/services/adapters';
 import type { ExtensionMessage } from '../src/shared/messages';
 
 export default defineContentScript({
