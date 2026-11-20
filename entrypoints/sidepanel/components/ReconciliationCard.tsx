@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type {
   AdaflowSyncState,
   ReconciliationAuditRecord,
@@ -60,6 +60,15 @@ export const ReconciliationCard: React.FC<ReconciliationCardProps> = ({
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [isDismissed, setIsDismissed] = useState<boolean>(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) {
+        clearTimeout(copyTimerRef.current);
+      }
+    };
+  }, []);
 
   const isSyncing = Boolean(syncState?.isSyncing);
 
@@ -90,8 +99,12 @@ export const ReconciliationCard: React.FC<ReconciliationCardProps> = ({
     }
 
     setCopiedKey(itemKey);
-    setTimeout(() => {
+    if (copyTimerRef.current) {
+      clearTimeout(copyTimerRef.current);
+    }
+    copyTimerRef.current = setTimeout(() => {
       setCopiedKey((curr) => (curr === itemKey ? null : curr));
+      copyTimerRef.current = null;
     }, 2000);
   };
 
