@@ -1,6 +1,6 @@
 import { browser } from 'wxt/browser';
 import { fetchAdaflowDeclarations } from '../src/services/adaflow-scraper';
-import { setAdaflowSyncState } from '../src/services/adaflow-reconciliation';
+import { setAdaflowSyncState } from '../src/services/adaflow-sync-state';
 import type { ExtensionMessage } from '../src/shared/messages';
 
 declare global {

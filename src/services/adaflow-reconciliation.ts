@@ -4,6 +4,7 @@ import type { TakerProfile } from '../domain/taker';
 import type { ServiceTemplate } from '../domain/template';
 import { saveTaker } from './takers';
 import { saveTemplate } from './templates';
+import { _resetSyncStateForTesting } from './adaflow-sync-state';
 import {
   fetchAdaflowDeclarations,
   type AdaflowReconciledDeclaration,
@@ -22,18 +23,17 @@ export {
   type FetchAdaflowDeclarationsResult,
 };
 
+export {
+  ADAFLOW_SYNC_STATE_STORAGE_KEY,
+  type AdaflowSyncState,
+  getAdaflowSyncState,
+  setAdaflowSyncState,
+  _resetSyncStateForTesting,
+} from './adaflow-sync-state';
+
 export const RECONCILIATION_AUDIT_STORAGE_KEY = 'last_reconciliation_audit';
 export const PROPOSED_TAKERS_STORAGE_KEY = 'adaflow_proposed_takers';
 export const PROPOSED_TEMPLATES_STORAGE_KEY = 'adaflow_proposed_templates';
-export const ADAFLOW_SYNC_STATE_STORAGE_KEY = 'adaflow_sync_state';
-
-export interface AdaflowSyncState {
-  isSyncing: boolean;
-  progressMessage?: string;
-  currentPage?: number;
-  totalPages?: number;
-  updatedAt: string;
-}
 
 export interface ProposedTaker {
   id: string;
@@ -87,74 +87,6 @@ export interface ReconcileAdaflowResult {
 let memoryAuditForTesting: ReconciliationAuditRecord | null = null;
 let memoryProposedTakersForTesting: ProposedTaker[] = [];
 let memoryProposedTemplatesForTesting: ProposedTemplate[] = [];
-let memorySyncStateForTesting: AdaflowSyncState | null = null;
-
-/**
- * Recupera o estado atual de sincronização da Adaflow do storage.
- */
-export async function getAdaflowSyncState(): Promise<AdaflowSyncState | null> {
-  try {
-    if (typeof browser !== 'undefined' && browser?.storage?.local?.get) {
-      const result = await browser.storage.local.get(ADAFLOW_SYNC_STATE_STORAGE_KEY);
-      const state = result?.[ADAFLOW_SYNC_STATE_STORAGE_KEY];
-      if (state) return state as AdaflowSyncState;
-      return null;
-    }
-
-    if (typeof chrome !== 'undefined' && chrome?.storage?.local?.get) {
-      return new Promise<AdaflowSyncState | null>((resolve) => {
-        chrome.storage.local.get([ADAFLOW_SYNC_STATE_STORAGE_KEY], (res: Record<string, unknown>) => {
-          const state = res?.[ADAFLOW_SYNC_STATE_STORAGE_KEY];
-          if (state) {
-            resolve(state as AdaflowSyncState);
-          } else {
-            resolve(null);
-          }
-        });
-      });
-    }
-  } catch (error) {
-    console.warn('[PingouNota:Reconciliação] Falha ao recuperar sync state de storage.local:', error);
-  }
-
-  return memorySyncStateForTesting;
-}
-
-/**
- * Salva o estado atual de sincronização da Adaflow no storage.
- */
-export async function setAdaflowSyncState(state: AdaflowSyncState): Promise<void> {
-  memorySyncStateForTesting = state;
-
-  try {
-    if (typeof browser !== 'undefined' && browser?.storage?.local?.set) {
-      await browser.storage.local.set({ [ADAFLOW_SYNC_STATE_STORAGE_KEY]: state });
-      return;
-    }
-
-    if (typeof chrome !== 'undefined' && chrome?.storage?.local?.set) {
-      await new Promise<void>((resolve, reject) => {
-        chrome.storage.local.set({ [ADAFLOW_SYNC_STATE_STORAGE_KEY]: state }, () => {
-          if (chrome.runtime?.lastError) {
-            reject(new Error(chrome.runtime.lastError.message));
-          } else {
-            resolve();
-          }
-        });
-      });
-      return;
-    }
-  } catch (error) {
-    console.warn('[PingouNota:Reconciliação] Falha ao salvar sync state em storage.local:', error);
-  }
-}
-
-/**
- * Helper interno para reset do sync state em testes.
- */
-export function _resetSyncStateForTesting(): void {
-  memorySyncStateForTesting = null;
-}
 
 /**
  * Recupera o último registro de auditoria de conciliação do storage.
@@ -221,7 +153,7 @@ export async function saveLastReconciliationAudit(audit: ReconciliationAuditReco
  */
 export function _resetMemoryAuditForTesting(): void {
   memoryAuditForTesting = null;
-  memorySyncStateForTesting = null;
+  _resetSyncStateForTesting();
 }
 
 export function _resetProposedForTesting(): void {
