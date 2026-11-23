@@ -163,6 +163,15 @@ export const PaymentRow: React.FC<PaymentRowProps> = ({
           <span className="payment-date" aria-label={`Data: ${formattedDate}`}>
             {formattedDate}
           </span>
+          {payment.sourcePaymentId && (
+            <span
+              className="payment-id-tag"
+              title={`ID da cobrança no ${providerLabel}: ${payment.sourcePaymentId}`}
+              data-testid={`payment-id-${payment.recordKey}`}
+            >
+              #{payment.sourcePaymentId}
+            </span>
+          )}
           <div className="payment-badges">
             <span
               className={`badge badge-provider badge-${payment.provider}`}

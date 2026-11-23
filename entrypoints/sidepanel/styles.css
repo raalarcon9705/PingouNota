@@ -544,6 +544,17 @@ h3 {
   color: var(--color-text-secondary);
 }
 
+.payment-id-tag {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background-color: var(--color-bg-secondary, rgba(255, 255, 255, 0.06));
+  padding: 1px 5px;
+  border-radius: var(--radius-badge, 4px);
+  border: 1px solid var(--color-border);
+}
+
 .payment-badges {
   display: flex;
   flex-wrap: wrap;

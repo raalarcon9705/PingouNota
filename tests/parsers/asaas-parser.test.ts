@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  extractAsaasRowPaymentId,
   parseAsaasPayments,
   parseBrlAmountToCents,
   parseDateToIso,
@@ -363,6 +364,48 @@ describe('Asaas Payments Parser', () => {
         paymentState: 'recebido',
       });
       expect(result.warnings).toHaveLength(0);
+    });
+  });
+
+  describe('extractAsaasRowPaymentId', () => {
+    it('extracts payment ID from data-payment-id attribute', () => {
+      const el = createDocument('<atlas-table-row data-payment-id="932162415"></atlas-table-row>').querySelector('atlas-table-row')!;
+      expect(extractAsaasRowPaymentId(el)).toBe('932162415');
+    });
+
+    it('normalizes formatted numeric payment IDs', () => {
+      const el = createDocument('<atlas-table-row data-payment-id="89.155.748"></atlas-table-row>').querySelector('atlas-table-row')!;
+      expect(extractAsaasRowPaymentId(el)).toBe('89155748');
+    });
+
+    it('extracts payment ID from href in various formats (payment, customerPayment, paymentList)', () => {
+      const el1 = createDocument('<atlas-table-row href="/customerPayment/show/932162415"></atlas-table-row>').querySelector('atlas-table-row')!;
+      expect(extractAsaasRowPaymentId(el1)).toBe('932162415');
+
+      const el2 = createDocument('<atlas-table-row href="/paymentList/show/970720795"></atlas-table-row>').querySelector('atlas-table-row')!;
+      expect(extractAsaasRowPaymentId(el2)).toBe('970720795');
+
+      const el3 = createDocument('<atlas-table-row href="/payment/show/969041525"></atlas-table-row>').querySelector('atlas-table-row')!;
+      expect(extractAsaasRowPaymentId(el3)).toBe('969041525');
+    });
+
+    it('extracts payment ID from data-anticipation-url query param', () => {
+      const el = createDocument(
+        '<atlas-table-row data-anticipation-url="/receivableAnticipationUnifiedJourney/index?paymentId=932162415"></atlas-table-row>',
+      ).querySelector('atlas-table-row')!;
+      expect(extractAsaasRowPaymentId(el)).toBe('932162415');
+    });
+
+    it('extracts payment ID from child anchor or payment-id element', () => {
+      const el = createDocument(
+        '<table><tr class="payment-row"><td data-field="payment-id"><a class="payment-id">#932162415</a></td></tr></table>',
+      ).querySelector('tr')!;
+      expect(extractAsaasRowPaymentId(el)).toBe('932162415');
+    });
+
+    it('extracts payment ID from row id attribute', () => {
+      const el = createDocument('<table><tr id="payment_932162415"></tr></table>').querySelector('tr')!;
+      expect(extractAsaasRowPaymentId(el)).toBe('932162415');
     });
   });
 });

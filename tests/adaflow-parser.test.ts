@@ -287,5 +287,61 @@ describe('Adaflow Parser', () => {
       expect(detail.taker?.address?.state).toBe('RJ');
       expect(detail.taker?.address?.postalCode).toBe('20510-000');
     });
+
+    it('parses real slideover layout with SERVIÇO header from user fixture (Nº 78)', () => {
+      // Replicates the real Adaflow slideover layout shown in the user screenshot:
+      // Title: Nº 78 SERGIVANDO ALAIR MARTINS
+      // Box: VALOR R$ 7,90, DATA 17/10/2026, SERVIÇO header + description
+      const slideoverHtml = `
+        <turbo-frame id="slideover_body">
+          <div class="px-5 py-4">
+            <h2 class="text-sm text-gray-500">Nº 78</h2>
+            <h1 class="text-xl font-bold text-gray-900">SERGIVANDO ALAIR MARTINS</h1>
+            <div class="mt-4 rounded-xl bg-gray-50 p-4">
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <span class="text-xs uppercase text-gray-400">VALOR</span>
+                  <p class="font-bold">R$ 7,90</p>
+                </div>
+                <div>
+                  <span class="text-xs uppercase text-gray-400">DATA</span>
+                  <p class="font-bold">17/10/2026</p>
+                </div>
+              </div>
+              <div class="mt-4">
+                <span class="text-xs uppercase text-gray-400 font-semibold">SERVIÇO</span>
+                <p class="mt-1 text-sm text-gray-700">
+                  Prestação de serviços de consulta judicial pela plataforma Komwise, referente à cobrança Asaas nº 932162415.
+                </p>
+              </div>
+            </div>
+            <div class="mt-6">
+              <span class="text-xs uppercase text-gray-400 font-semibold">ACOMPANHAMENTO</span>
+              <p>Emitida</p>
+            </div>
+          </div>
+        </turbo-frame>
+      `;
+
+      const detail = parseAdaflowSlideover(slideoverHtml);
+      expect(detail.asaasPaymentId).toBe('932162415');
+      expect(detail.description).toBe(
+        'Prestação de serviços de consulta judicial pela plataforma Komwise, referente à cobrança Asaas nº 932162415.',
+      );
+      // Ensure internal NFSe number "78" is not extracted as the Asaas payment ID
+      expect(detail.asaasPaymentId).not.toBe('78');
+    });
+
+    it('rejects short numeric strings like internal NFSe numbers (e.g. 78) as Asaas payment IDs', () => {
+      expect(extractAsaasPaymentId('78')).toBeNull();
+      expect(extractAsaasPaymentId('Nº 78')).toBeNull();
+      expect(extractAsaasPaymentId('12345')).toBeNull();
+    });
+
+    it('extracts payment ID from reference without the word Asaas when cobrança is specified with >=7 digits', () => {
+      expect(
+        extractAsaasPaymentId('Prestação de serviços referente à cobrança nº 932162415'),
+      ).toBe('932162415');
+    });
   });
 });

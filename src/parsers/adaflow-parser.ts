@@ -67,6 +67,8 @@ export function extractAsaasPaymentId(text: string | null | undefined): string |
     /referente [aà] cobran[çc]a Asaas\s*(?:n[º°o\.]|num\.?|#)?\s*([0-9][0-9\.\s\-_/]*[0-9]|\d+)/i,
     /cobran[çc]a Asaas\s*(?:n[º°o\.]|num\.?|#)?\s*([0-9][0-9\.\s\-_/]*[0-9]|\d+)/i,
     /Asaas\s*(?:n[º°o\.]|num\.?|#)?\s*([0-9][0-9\.\s\-_/]*[0-9]|\d+)/i,
+    /referente [aà] cobran[çc]a\s*(?:n[º°o\.]|num\.?|#)?\s*([0-9][0-9\.\s\-_/]*[0-9]|\d{7,12})/i,
+    /cobran[çc]a\s*(?:n[º°o\.]|num\.?|#)\s*([0-9][0-9\.\s\-_/]*[0-9]|\d{7,12})/i,
   ];
 
   for (const regex of patterns) {
@@ -90,11 +92,12 @@ export function extractAsaasPaymentId(text: string | null | undefined): string |
     }
   }
 
-  // Handle case where text itself is purely a formatted numeric token (e.g. "89.155.748")
+  // Handle case where text itself is purely a formatted numeric token (e.g. "89.155.748" or "932162415")
+  // Strict minimum length >= 7 ensures internal Adaflow NFSe numbers like "78" are never misidentified as Asaas payment IDs.
   const trimmed = text.trim();
   if (/^[0-9][0-9\.\s\-_/]*[0-9]$|^\d+$/.test(trimmed)) {
     const cleaned = trimmed.replace(/\D/g, '');
-    if (cleaned.length > 0) {
+    if (cleaned.length >= 7) {
       return cleaned;
     }
   }
@@ -344,28 +347,86 @@ export function parseAdaflowSlideover(
 
   const searchScope = frame || root;
 
-  // Attempt to locate a specific description block
+  // 1. Locate service description block with explicit selector
+  let description: string | undefined;
+
   const descEl =
     searchScope.querySelector('[data-field="description"]') ||
     searchScope.querySelector('.service-description') ||
     searchScope.querySelector('p.whitespace-pre-wrap') ||
     searchScope.querySelector('div.whitespace-pre-wrap');
 
-  const description =
-    descEl?.textContent?.trim() ||
-    frame?.textContent?.trim() ||
-    (root instanceof Element ? root.textContent?.trim() : root.body?.textContent?.trim()) ||
-    undefined;
+  if (descEl?.textContent?.trim()) {
+    description = descEl.textContent.trim();
+  }
 
-  const fullTextToSearch = [
-    description,
-    frame?.textContent,
-    root instanceof Element ? root.textContent : root.body?.textContent,
-  ]
-    .filter(Boolean)
-    .join('\n');
+  // 2. Search for SERVIÇO header/label in slideover and capture the description right after it
+  if (!description) {
+    const candidateLabels = Array.from(
+      searchScope.querySelectorAll('p, span, div, h2, h3, h4, dt, label'),
+    );
+    const servicoLabel = candidateLabels.find((el) => {
+      const text = el.textContent?.trim().toUpperCase();
+      return (
+        text === 'SERVIÇO' ||
+        text === 'SERVICO' ||
+        text === 'DISCRIMINAÇÃO DOS SERVIÇOS' ||
+        text === 'DESCRIÇÃO DO SERVIÇO'
+      );
+    });
 
-  const asaasPaymentId = extractAsaasPaymentId(fullTextToSearch);
+    if (servicoLabel) {
+      const nextSibling = servicoLabel.nextElementSibling;
+      if (nextSibling && nextSibling.textContent?.trim()) {
+        description = nextSibling.textContent.trim();
+      } else if (servicoLabel.parentElement) {
+        const siblings = Array.from(servicoLabel.parentElement.children);
+        const idx = siblings.indexOf(servicoLabel);
+        const candidate = idx !== -1 ? siblings[idx + 1] : undefined;
+        if (candidate?.textContent?.trim()) {
+          description = candidate.textContent.trim();
+        }
+      }
+    }
+  }
+
+  // 3. Fallback: look for a paragraph containing service / cobrança / asaas keywords
+  if (!description) {
+    const paragraphs = Array.from(searchScope.querySelectorAll('p, div.text-sm, div.text-base'));
+    const matchedP = paragraphs.find((p) => {
+      const text = p.textContent?.trim() || '';
+      return (
+        /referente [aà] cobran[çc]a/i.test(text) ||
+        /prestação de serviços/i.test(text) ||
+        (/cobran[çc]a Asaas/i.test(text) && text.length > 20)
+      );
+    });
+    if (matchedP?.textContent?.trim()) {
+      description = matchedP.textContent.trim();
+    }
+  }
+
+  // 4. Last resort fallback: whole scope text
+  if (!description) {
+    description =
+      frame?.textContent?.trim() ||
+      (root instanceof Element ? root.textContent?.trim() : root.body?.textContent?.trim()) ||
+      undefined;
+  }
+
+  // Extract Asaas Payment ID strictly from the service description first,
+  // falling back to full text only if not resolved from description.
+  const asaasPaymentId =
+    extractAsaasPaymentId(description) ||
+    extractAsaasPaymentId(
+      [
+        description,
+        frame?.textContent,
+        root instanceof Element ? root.textContent : root.body?.textContent,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    );
 
   // Extract taker information if present
   const takerScope =

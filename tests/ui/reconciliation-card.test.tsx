@@ -158,7 +158,7 @@ describe('ReconciliationCard (Apple HIG)', () => {
     expect(item66).toBeInTheDocument();
     expect(item66).toHaveTextContent('Nota 66 • 11/11/2026');
     expect(item66).toHaveTextContent('Tomador: Empresa Alpha Ltda');
-    expect(item66).toHaveTextContent('ID Asaas extraído: 891557');
+    expect(item66).toHaveTextContent('ID Asaas (da descrição): 891557');
     expect(item66).toHaveTextContent(
       'Descrição do serviço: Desenvolvimento de software referente a cobranca Asaas 891557',
     );
@@ -171,7 +171,7 @@ describe('ReconciliationCard (Apple HIG)', () => {
     expect(item67).toBeInTheDocument();
     expect(item67).toHaveTextContent('Nota 67 • 12/11/2026');
     expect(item67).toHaveTextContent('Tomador: Empresa Beta S/A');
-    expect(item67).toHaveTextContent('ID Asaas extraído: (não identificado)');
+    expect(item67).toHaveTextContent('ID Asaas (da descrição): (não identificado)');
     expect(item67).toHaveTextContent('Descrição do serviço: Consultoria e mentoria avulsa');
     expect(item67).toHaveTextContent(
       'Motivo: Cobrança Asaas não encontrada na base local de pagamentos.',
@@ -217,7 +217,7 @@ describe('ReconciliationCard (Apple HIG)', () => {
     fireEvent.click(copyBtn);
 
     expect(writeTextMock).toHaveBeenCalledWith(
-      expect.stringContaining('ID Asaas: 891557'),
+      expect.stringContaining('ID Asaas (da descrição): 891557'),
     );
     expect(writeTextMock).toHaveBeenCalledWith(
       expect.stringContaining('NFSe: 66'),

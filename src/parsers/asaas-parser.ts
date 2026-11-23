@@ -24,6 +24,96 @@ export function parseDateToIso(dateStr: string | null | undefined): string | nul
   return null;
 }
 
+/**
+ * Robustly extracts the Asaas payment ID from a table row (Atlas Web Component or legacy table).
+ * Extracts from data-payment-id, data-id, href, data-link-url, data-anticipation-url,
+ * child links, row IDs, or explicit payment-id elements.
+ * Normalizes formatted numeric IDs (e.g. 89.155.748 -> 89155748, #932162415 -> 932162415).
+ */
+export function extractAsaasRowPaymentId(row: Element): string | null {
+  if (!row) return null;
+  // 1. Direct data-payment-id, data-id, or data-source-id attribute
+  const dataPaymentId =
+    row.getAttribute('data-payment-id')?.trim() ||
+    row.getAttribute('data-id')?.trim() ||
+    row.getAttribute('data-source-id')?.trim();
+
+  if (dataPaymentId && dataPaymentId !== '-' && dataPaymentId !== '—' && dataPaymentId !== 'N/A') {
+    if (/^[0-9][0-9\.\s\-_/]*[0-9]$|^\d+$/.test(dataPaymentId)) {
+      return dataPaymentId.replace(/\D/g, '');
+    }
+    return dataPaymentId;
+  }
+
+  // 2. URLs in href, data-link-url, data-anticipation-url, data-invoice-url, or child links
+  const urlCandidates = [
+    row.getAttribute('href'),
+    row.getAttribute('data-link-url'),
+    row.getAttribute('data-anticipation-url'),
+    row.getAttribute('data-invoice-url'),
+  ].filter(Boolean) as string[];
+
+  const links = Array.from(row.querySelectorAll('a[href]'));
+  for (const l of links) {
+    const href = l.getAttribute('href');
+    if (href) urlCandidates.push(href);
+  }
+
+  for (const url of urlCandidates) {
+    const patterns = [
+      /(?:payment|customerPayment|paymentList|payments)\/(?:show\/)?([a-zA-Z0-9_\-]+)/i,
+      /[?&](?:paymentId|id)=([a-zA-Z0-9_\-]+)/i,
+    ];
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match && match[1]) {
+        const val = match[1].trim();
+        if (/^[0-9][0-9\.\s\-_/]*[0-9]$|^\d+$/.test(val)) {
+          return val.replace(/\D/g, '');
+        }
+        if (val !== 'show' && val !== 'index' && val !== 'list') {
+          return val;
+        }
+      }
+    }
+  }
+
+  // 3. ID in row attribute (e.g. id="payment_932162415" or id="payment-932162415")
+  const rowId = row.getAttribute('id');
+  if (rowId) {
+    const idMatch = rowId.match(/(?:payment|cobranca|row)[-_]([a-zA-Z0-9_\-]+)/i);
+    if (idMatch && idMatch[1]) {
+      const val = idMatch[1].trim();
+      if (/^[0-9][0-9\.\s\-_/]*[0-9]$|^\d+$/.test(val)) {
+        return val.replace(/\D/g, '');
+      }
+      return val;
+    }
+  }
+
+  // 4. Text in child elements: a.payment-id, [data-field="payment-id"], .payment-id, [data-field="id"]
+  const idEl = row.querySelector(
+    'a.payment-id, [data-field="payment-id"] a, [data-field="payment-id"], .payment-id, [data-field="id"]',
+  );
+  const text = idEl?.textContent?.trim();
+  if (text && text !== '-' && text !== '—' && text !== 'N/A') {
+    const cleanedText = text.replace(/^#/, '').trim();
+    if (/^[0-9][0-9\.\s\-_/]*[0-9]$|^\d+$/.test(cleanedText)) {
+      return cleanedText.replace(/\D/g, '');
+    }
+    return cleanedText;
+  }
+
+  // 5. Input or checkbox value with numeric ID
+  const inputEl = row.querySelector('input[name*="payment" i], input[type="checkbox"][value]');
+  const inputValue = inputEl?.getAttribute('value')?.trim();
+  if (inputValue && /^\d{6,12}$/.test(inputValue)) {
+    return inputValue;
+  }
+
+  return null;
+}
+
 export function parseBrlAmountToCents(amountStr: string | null | undefined): number | null {
   if (!amountStr) return null;
   const trimmed = amountStr.trim();
@@ -106,25 +196,7 @@ export function parseAsaasPayments(document: Document): ParseResult {
       : directAtlasRows;
 
     rowElements.forEach((row, index) => {
-      let sourcePaymentId = row.getAttribute('data-payment-id')?.trim() || null;
-      if (!sourcePaymentId) {
-        const href =
-          row.getAttribute('href') ||
-          row.getAttribute('data-link-url') ||
-          row.querySelector('a[href*="/payment/show/"]')?.getAttribute('href') ||
-          '';
-        const match = href.match(/\/payment\/show\/(\d+)/);
-        if (match && match[1]) {
-          sourcePaymentId = match[1];
-        }
-      }
-      if (!sourcePaymentId) {
-        const idEl = row.querySelector('a.payment-id, [data-field="payment-id"] a, [data-field="payment-id"]');
-        const text = idEl?.textContent?.trim();
-        if (text && text !== '-' && text !== '—' && text !== 'N/A') {
-          sourcePaymentId = text;
-        }
-      }
+      const sourcePaymentId = extractAsaasRowPaymentId(row);
 
       const identityConfidence = sourcePaymentId ? 'high' : 'low';
       if (!sourcePaymentId) {
@@ -234,14 +306,7 @@ export function parseAsaasPayments(document: Document): ParseResult {
     }
 
     rowElements.forEach((row, index) => {
-      let sourcePaymentId = row.getAttribute('data-payment-id')?.trim() || null;
-      if (!sourcePaymentId) {
-        const idEl = row.querySelector('a.payment-id, [data-field="payment-id"] a, [data-field="payment-id"]');
-        const text = idEl?.textContent?.trim();
-        if (text && text !== '-' && text !== '—' && text !== 'N/A') {
-          sourcePaymentId = text;
-        }
-      }
+      const sourcePaymentId = extractAsaasRowPaymentId(row);
 
       const identityConfidence = sourcePaymentId ? 'high' : 'low';
       if (!sourcePaymentId) {

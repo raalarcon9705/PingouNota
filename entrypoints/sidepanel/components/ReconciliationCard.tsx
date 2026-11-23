@@ -88,8 +88,8 @@ export const ReconciliationCard: React.FC<ReconciliationCardProps> = ({
     itemKey: string,
   ) => {
     const idText = note.asaasPaymentId
-      ? `ID Asaas: ${note.asaasPaymentId}`
-      : 'ID Asaas: (não identificado)';
+      ? `ID Asaas (da descrição): ${note.asaasPaymentId}`
+      : 'ID Asaas (da descrição): (não identificado)';
     const nfseText = note.nfseNumber ? `NFSe: ${note.nfseNumber}` : `NFSe ID: ${note.adaflowNfseId}`;
     const descText = note.description ? `Descrição: ${note.description}` : '';
     const textToCopy = [idText, nfseText, descText].filter(Boolean).join('\n');
@@ -244,7 +244,7 @@ export const ReconciliationCard: React.FC<ReconciliationCardProps> = ({
 
                         <div className="unmatched-item-body">
                           <div className="unmatched-field">
-                            <span className="unmatched-field-label">ID Asaas extraído:</span>{' '}
+                            <span className="unmatched-field-label">ID Asaas (da descrição):</span>{' '}
                             <code className="unmatched-code">{asaasIdDisplay}</code>
                           </div>
                           {note.description && (
